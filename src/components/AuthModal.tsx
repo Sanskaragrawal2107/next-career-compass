@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ interface AuthModalProps {
 }
 
 const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -52,6 +54,13 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
         });
         onOpenChange(false);
         setFormData({ email: '', password: '', fullName: '' });
+        
+        // Redirect to dashboard after successful login (not signup)
+        if (!isSignUp) {
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 1000);
+        }
       }
     } catch (error) {
       toast({
@@ -74,6 +83,9 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
           description: error.message,
           variant: "destructive",
         });
+      } else {
+        onOpenChange(false);
+        // The redirect URL in the Google auth will handle navigation
       }
     } catch (error) {
       toast({

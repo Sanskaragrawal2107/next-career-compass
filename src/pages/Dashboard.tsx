@@ -21,15 +21,23 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    console.log('Dashboard mounted, auth state:', { user: user?.email, subscription, authLoading });
+    
     if (!authLoading && !user) {
+      console.log('No user found, redirecting to home');
       navigate('/');
       return;
     }
     
+    // For now, allow users to access dashboard regardless of subscription status
+    // You can uncomment this later when you want to enforce subscriptions
+    /*
     if (!authLoading && !subscription?.subscribed) {
+      console.log('User not subscribed, redirecting to pricing');
       navigate('/pricing');
       return;
     }
+    */
 
     if (user) {
       fetchUserStats();
@@ -40,6 +48,8 @@ const Dashboard = () => {
     if (!user) return;
 
     try {
+      console.log('Fetching user stats for:', user.id);
+      
       // Fetch resume count
       const { count: resumeCount } = await supabase
         .from('resumes')
@@ -53,23 +63,28 @@ const Dashboard = () => {
         .eq('user_id', user.id);
 
       // Fetch job matches count
-      const { data: jobMatches } = await supabase
-        .from('job_matches')
-        .select('id, job_search_id')
-        .in('job_search_id', 
-          await supabase
-            .from('job_searches')
-            .select('id')
-            .eq('user_id', user.id)
-            .then(res => res.data?.map(js => js.id) || [])
-        );
+      const { data: jobSearches } = await supabase
+        .from('job_searches')
+        .select('id')
+        .eq('user_id', user.id);
+
+      let jobMatchCount = 0;
+      if (jobSearches && jobSearches.length > 0) {
+        const { count } = await supabase
+          .from('job_matches')
+          .select('*', { count: 'exact', head: true })
+          .in('job_search_id', jobSearches.map(js => js.id));
+        jobMatchCount = count || 0;
+      }
 
       setStats({
         resumesAnalyzed: resumeCount || 0,
-        jobMatches: jobMatches?.length || 0,
+        jobMatches: jobMatchCount,
         skillsIdentified: 0, // Will be calculated from extracted skills
         roadmapsGenerated: jobSearchCount || 0,
       });
+      
+      console.log('Stats updated:', { resumeCount, jobMatchCount, jobSearchCount });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -103,6 +118,8 @@ const Dashboard = () => {
       const fileExt = 'pdf';
       const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
       
+      console.log('Uploading file:', fileName);
+      
       // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('resumes')
@@ -116,6 +133,8 @@ const Dashboard = () => {
       const { data } = supabase.storage
         .from('resumes')
         .getPublicUrl(fileName);
+
+      console.log('File uploaded, saving to database');
 
       // Save resume record to database
       const { error: dbError } = await supabase
@@ -168,7 +187,7 @@ const Dashboard = () => {
     );
   }
 
-  if (!user || !subscription?.subscribed) {
+  if (!user) {
     return null;
   }
 
@@ -186,7 +205,7 @@ const Dashboard = () => {
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
               Plan: <span className="font-semibold text-primary">
-                {subscription.subscription_tier || 'Premium'}
+                {subscription?.subscription_tier || 'Free'}
               </span>
             </div>
             <Button variant="outline" onClick={handleLogout}>
