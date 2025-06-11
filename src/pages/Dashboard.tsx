@@ -3,15 +3,18 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, FileText, Target, TrendingUp, Download, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import ResumeAnalysis from '@/components/ResumeAnalysis';
+import JobMatches from '@/components/JobMatches';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, profile, subscription, signOut, loading: authLoading } = useAuth();
-  const [uploadedResume, setUploadedResume] = useState<File | null>(null);
+  const [uploadedResume, setUploadedResume] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [stats, setStats] = useState({
     resumesAnalyzed: 0,
@@ -19,6 +22,7 @@ const Dashboard = () => {
     skillsIdentified: 0,
     roadmapsGenerated: 0,
   });
+  const [activeTab, setActiveTab] = useState("upload");
 
   useEffect(() => {
     console.log('Dashboard mounted, auth state:', { user: user?.email, subscription, authLoading });
@@ -28,19 +32,10 @@ const Dashboard = () => {
       navigate('/');
       return;
     }
-    
-    // For now, allow users to access dashboard regardless of subscription status
-    // You can uncomment this later when you want to enforce subscriptions
-    /*
-    if (!authLoading && !subscription?.subscribed) {
-      console.log('User not subscribed, redirecting to pricing');
-      navigate('/pricing');
-      return;
-    }
-    */
 
     if (user) {
       fetchUserStats();
+      fetchLatestResume();
     }
   }, [user, subscription, authLoading, navigate]);
 
@@ -50,19 +45,16 @@ const Dashboard = () => {
     try {
       console.log('Fetching user stats for:', user.id);
       
-      // Fetch resume count
       const { count: resumeCount } = await supabase
         .from('resumes')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      // Fetch job searches count
       const { count: jobSearchCount } = await supabase
         .from('job_searches')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      // Fetch job matches count
       const { data: jobSearches } = await supabase
         .from('job_searches')
         .select('id')
@@ -80,13 +72,37 @@ const Dashboard = () => {
       setStats({
         resumesAnalyzed: resumeCount || 0,
         jobMatches: jobMatchCount,
-        skillsIdentified: 0, // Will be calculated from extracted skills
+        skillsIdentified: 0,
         roadmapsGenerated: jobSearchCount || 0,
       });
       
       console.log('Stats updated:', { resumeCount, jobMatchCount, jobSearchCount });
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchLatestResume = async () => {
+    if (!user) return;
+
+    try {
+      const { data: resumes, error } = await supabase
+        .from('resumes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      
+      if (resumes && resumes.length > 0) {
+        setUploadedResume(resumes[0]);
+        if (resumes[0].extracted_skills) {
+          setActiveTab("analysis");
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching resume:', error);
     }
   };
 
@@ -103,7 +119,7 @@ const Dashboard = () => {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "File too large",
         description: "Please upload a file smaller than 10MB.",
@@ -120,7 +136,6 @@ const Dashboard = () => {
       
       console.log('Uploading file:', fileName);
       
-      // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('resumes')
         .upload(fileName, file);
@@ -129,15 +144,13 @@ const Dashboard = () => {
         throw uploadError;
       }
 
-      // Get public URL
       const { data } = supabase.storage
         .from('resumes')
         .getPublicUrl(fileName);
 
       console.log('File uploaded, saving to database');
 
-      // Save resume record to database
-      const { error: dbError } = await supabase
+      const { data: resumeData, error: dbError } = await supabase
         .from('resumes')
         .insert({
           user_id: user!.id,
@@ -145,19 +158,22 @@ const Dashboard = () => {
           file_url: data.publicUrl,
           extracted_skills: {},
           parsed_content: '',
-        });
+        })
+        .select()
+        .single();
 
       if (dbError) {
         throw dbError;
       }
 
-      setUploadedResume(file);
+      setUploadedResume(resumeData);
+      setActiveTab("analysis");
+      
       toast({
         title: "Resume uploaded successfully!",
-        description: "We'll analyze your resume and extract skills.",
+        description: "Ready for AI analysis.",
       });
 
-      // Refresh stats
       fetchUserStats();
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -174,6 +190,11 @@ const Dashboard = () => {
   const handleLogout = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handleAnalysisComplete = () => {
+    setActiveTab("matches");
+    fetchUserStats();
   };
 
   if (authLoading) {
@@ -215,153 +236,115 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Progress Steps */}
+        {/* Progress Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className={`border-2 ${uploadedResume ? 'border-green-500 bg-green-50' : 'border-primary'}`}>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center text-sm">
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Resume
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">
-                {uploadedResume ? '✓ Completed' : 'Upload your LinkedIn resume'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center text-sm">
-                <Target className="w-4 h-4 mr-2" />
-                Select Job Titles
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">Choose target roles</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center text-sm">
-                <TrendingUp className="w-4 h-4 mr-2" />
-                Skill Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">Get personalized roadmap</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center text-sm">
-                <Download className="w-4 h-4 mr-2" />
-                Get Results
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">Download optimized resumes</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Resume Upload Section */}
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Resume Upload
-              </CardTitle>
-              <CardDescription>
-                Upload your LinkedIn resume in PDF format to get started
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="resume-upload"
-                  disabled={uploading}
-                />
-                <label htmlFor="resume-upload" className="cursor-pointer">
-                  <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">
-                    {uploading ? 'Uploading...' : uploadedResume ? uploadedResume.name : 'Click to upload your resume'}
-                  </p>
-                  <p className="text-gray-500">PDF files only, max 10MB</p>
-                </label>
-              </div>
-              
-              {uploadedResume && (
-                <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center">
-                    <FileText className="w-5 h-5 text-green-600 mr-2" />
-                    <span className="text-green-800 font-medium">Resume uploaded successfully!</span>
-                  </div>
-                  <p className="text-green-600 text-sm mt-1">Ready for AI analysis</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Progress Stats */}
           <Card>
-            <CardHeader>
-              <CardTitle>Your Progress</CardTitle>
-              <CardDescription>Track your career enhancement journey</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                  <span className="text-sm font-medium">Resumes Analyzed</span>
-                  <span className="text-xl font-bold text-blue-600">{stats.resumesAnalyzed}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                  <span className="text-sm font-medium">Job Matches Found</span>
-                  <span className="text-xl font-bold text-green-600">{stats.jobMatches}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                  <span className="text-sm font-medium">Skills Identified</span>
-                  <span className="text-xl font-bold text-purple-600">{stats.skillsIdentified}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                  <span className="text-sm font-medium">Roadmaps Generated</span>
-                  <span className="text-xl font-bold text-orange-600">{stats.roadmapsGenerated}</span>
-                </div>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Resumes Analyzed</span>
+                <span className="text-2xl font-bold text-blue-600">{stats.resumesAnalyzed}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Job Matches</span>
+                <span className="text-2xl font-bold text-green-600">{stats.jobMatches}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Skills Identified</span>
+                <span className="text-2xl font-bold text-purple-600">{stats.skillsIdentified}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Searches Done</span>
+                <span className="text-2xl font-bold text-orange-600">{stats.roadmapsGenerated}</span>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Next Steps */}
-        {uploadedResume && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle>Next Steps</CardTitle>
-              <CardDescription>Continue your career enhancement journey</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4">
-                <Button className="flex items-center">
-                  <Target className="w-4 h-4 mr-2" />
-                  Analyze Skills & Get Job Suggestions
-                </Button>
-                <Button variant="outline" className="flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  View Skill Gaps
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload" className="flex items-center">
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Resume
+            </TabsTrigger>
+            <TabsTrigger value="analysis" disabled={!uploadedResume}>
+              <Target className="w-4 h-4 mr-2" />
+              AI Analysis
+            </TabsTrigger>
+            <TabsTrigger value="matches" disabled={!uploadedResume}>
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Job Matches
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="upload" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Resume Upload
+                </CardTitle>
+                <CardDescription>
+                  Upload your LinkedIn resume in PDF format to get started
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="resume-upload"
+                    disabled={uploading}
+                  />
+                  <label htmlFor="resume-upload" className="cursor-pointer">
+                    <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-lg font-medium text-gray-900 mb-2">
+                      {uploading ? 'Uploading...' : uploadedResume ? uploadedResume.file_name : 'Click to upload your resume'}
+                    </p>
+                    <p className="text-gray-500">PDF files only, max 10MB</p>
+                  </label>
+                </div>
+                
+                {uploadedResume && (
+                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center">
+                      <FileText className="w-5 h-5 text-green-600 mr-2" />
+                      <span className="text-green-800 font-medium">Resume uploaded successfully!</span>
+                    </div>
+                    <p className="text-green-600 text-sm mt-1">Ready for AI analysis</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analysis" className="space-y-6">
+            {uploadedResume && (
+              <ResumeAnalysis 
+                resumeId={uploadedResume.id} 
+                onAnalysisComplete={handleAnalysisComplete}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="matches" className="space-y-6">
+            <JobMatches />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
