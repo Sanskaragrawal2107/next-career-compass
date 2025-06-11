@@ -1,27 +1,31 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
-interface User {
+interface UserProfile {
   id: string;
   email: string;
-  name?: string;
-  avatar?: string;
+  full_name?: string;
+  avatar_url?: string;
 }
 
 interface Subscription {
   subscribed: boolean;
-  plan?: string;
-  expiresAt?: Date;
+  subscription_tier?: string;
+  subscription_end?: Date;
 }
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   subscription: Subscription | null;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => Promise<void>;
+  session: Session | null;
   loading: boolean;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any }>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,135 +40,144 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const checkSession = async () => {
-      try {
-        const savedUser = localStorage.getItem('user');
-        const savedSubscription = localStorage.getItem('subscription');
+    // Set up auth state listener
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        setSession(session);
+        setUser(session?.user ?? null);
         
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
+        if (session?.user) {
+          // Fetch user profile and subscription
+          setTimeout(async () => {
+            await fetchUserProfile(session.user.id);
+            await fetchSubscription(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+          setSubscription(null);
         }
         
-        if (savedSubscription) {
-          setSubscription(JSON.parse(savedSubscription));
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    checkSession();
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+        fetchSubscription(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    return () => authSubscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
+  const fetchUserProfile = async (userId: string) => {
     try {
-      // Simulate login
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        id: '1',
-        email,
-        name: email.split('@')[0],
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      // Check subscription status
-      const mockSubscription: Subscription = {
-        subscribed: false,
-      };
-      
-      setSubscription(mockSubscription);
-      localStorage.setItem('subscription', JSON.stringify(mockSubscription));
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      setProfile(data);
     } catch (error) {
-      throw new Error('Login failed');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching profile:', error);
     }
   };
 
-  const loginWithGoogle = async () => {
-    setLoading(true);
+  const fetchSubscription = async (userId: string) => {
     try {
-      // Simulate Google OAuth
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const mockUser: User = {
-        id: '1',
-        email: 'user@gmail.com',
-        name: 'John Doe',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      // Check subscription status
-      const mockSubscription: Subscription = {
-        subscribed: false,
-      };
-      
-      setSubscription(mockSubscription);
-      localStorage.setItem('subscription', JSON.stringify(mockSubscription));
+      const { data, error } = await supabase
+        .from('subscribers')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching subscription:', error);
+        return;
+      }
+
+      setSubscription({
+        subscribed: data.subscribed,
+        subscription_tier: data.subscription_tier,
+        subscription_end: data.subscription_end ? new Date(data.subscription_end) : undefined,
+      });
     } catch (error) {
-      throw new Error('Google login failed');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching subscription:', error);
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
-    setLoading(true);
-    try {
-      // Simulate registration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        id: '1',
-        email,
-        name,
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      const mockSubscription: Subscription = {
-        subscribed: false,
-      };
-      
-      setSubscription(mockSubscription);
-      localStorage.setItem('subscription', JSON.stringify(mockSubscription));
-    } catch (error) {
-      throw new Error('Registration failed');
-    } finally {
-      setLoading(false);
-    }
+  const signUp = async (email: string, password: string, fullName: string) => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+
+    return { error };
   };
 
-  const logout = async () => {
-    setUser(null);
-    setSubscription(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('subscription');
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    return { error };
+  };
+
+  const signInWithGoogle = async () => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    return { error };
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
   };
 
   const value: AuthContextType = {
     user,
+    profile,
     subscription,
-    login,
-    loginWithGoogle,
-    register,
-    logout,
+    session,
     loading,
+    signUp,
+    signIn,
+    signInWithGoogle,
+    signOut,
   };
 
   return (

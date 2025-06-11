@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,12 +19,16 @@ import AuthModal from '@/components/AuthModal';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, subscription, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const handleGetStarted = () => {
     if (user) {
-      navigate('/dashboard');
+      if (subscription?.subscribed) {
+        navigate('/dashboard');
+      } else {
+        navigate('/pricing');
+      }
     } else {
       setAuthModalOpen(true);
     }
@@ -87,6 +90,17 @@ const Index = () => {
     }
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
@@ -101,8 +115,8 @@ const Index = () => {
           
           <div className="flex items-center space-x-4">
             {user ? (
-              <Button onClick={() => navigate('/dashboard')}>
-                Go to Dashboard
+              <Button onClick={() => navigate(subscription?.subscribed ? '/dashboard' : '/pricing')}>
+                {subscription?.subscribed ? 'Go to Dashboard' : 'Subscribe Now'}
               </Button>
             ) : (
               <>

@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Lock, User, Chrome } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { Mail, Lock, User, Chrome } from 'lucide-react';
 
 interface AuthModalProps {
   open: boolean;
@@ -15,26 +15,48 @@ interface AuthModalProps {
 }
 
 const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
-  const { login, register, loginWithGoogle } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ email: '', password: '', name: '' });
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+  });
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const { signUp, signIn, signInWithGoogle } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
-      await login(loginForm.email, loginForm.password);
-      toast({
-        title: "Welcome back!",
-        description: "You've been successfully logged in.",
-      });
-      onOpenChange(false);
+      let result;
+      if (isSignUp) {
+        result = await signUp(formData.email, formData.password, formData.fullName);
+      } else {
+        result = await signIn(formData.email, formData.password);
+      }
+
+      if (result.error) {
+        toast({
+          title: "Authentication Error",
+          description: result.error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: isSignUp ? "Account created!" : "Welcome back!",
+          description: isSignUp 
+            ? "Please check your email to verify your account." 
+            : "You have been successfully signed in.",
+        });
+        onOpenChange(false);
+        setFormData({ email: '', password: '', fullName: '' });
+      }
     } catch (error) {
       toast({
-        title: "Login failed",
-        description: "Please check your credentials and try again.",
+        title: "Error",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -42,21 +64,21 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    
     try {
-      await register(registerForm.email, registerForm.password, registerForm.name);
-      toast({
-        title: "Account created!",
-        description: "Welcome to your new account.",
-      });
-      onOpenChange(false);
+      const { error } = await signInWithGoogle();
+      if (error) {
+        toast({
+          title: "Google Sign In Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
-        title: "Registration failed",
-        description: "Please try again with different credentials.",
+        title: "Error",
+        description: "Failed to sign in with Google.",
         variant: "destructive",
       });
     } finally {
@@ -64,172 +86,120 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    
-    try {
-      await loginWithGoogle();
-      toast({
-        title: "Welcome!",
-        description: "You've been successfully logged in with Google.",
-      });
-      onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: "Google login failed",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    setFormData({ email: '', password: '', fullName: '' });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-center">Welcome</DialogTitle>
+          <DialogTitle className="text-center">
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
+          </DialogTitle>
           <DialogDescription className="text-center">
-            Sign in to your account or create a new one to get started
+            {isSignUp 
+              ? 'Start your AI-powered career journey today' 
+              : 'Sign in to access your career dashboard'
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Sign In</TabsTrigger>
-            <TabsTrigger value="register">Sign Up</TabsTrigger>
-          </TabsList>
+        <div className="space-y-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full"
+          >
+            <Chrome className="w-4 h-4 mr-2" />
+            Continue with Google
+          </Button>
 
-          <TabsContent value="login" className="space-y-4">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    className="pl-10"
-                    value={loginForm.email}
-                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10"
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Signing In...
-                  </div>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="register" className="space-y-4">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="register-name">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-name"
-                    type="text"
-                    placeholder="John Doe"
-                    className="pl-10"
-                    value={registerForm.name}
-                    onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    className="pl-10"
-                    value={registerForm.email}
-                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="register-password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Creating Account...
-                  </div>
-                ) : (
-                  'Create Account'
-                )}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or continue with email
+              </span>
+            </div>
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="fullName"
+                    placeholder="Enter your full name"
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    className="pl-10"
+                    required={isSignUp}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                </div>
+              ) : (
+                isSignUp ? 'Create Account' : 'Sign In'
+              )}
+            </Button>
+          </form>
+
+          <div className="text-center">
+            <Button variant="link" onClick={toggleMode} className="text-sm">
+              {isSignUp 
+                ? 'Already have an account? Sign in' 
+                : "Don't have an account? Sign up"
+              }
+            </Button>
           </div>
         </div>
-
-        <Button
-          variant="outline"
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full"
-        >
-          <Chrome className="mr-2 h-4 w-4" />
-          Continue with Google
-        </Button>
       </DialogContent>
     </Dialog>
   );

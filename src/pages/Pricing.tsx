@@ -64,7 +64,8 @@ const Pricing = () => {
 
     setLoading(planId);
     
-    // Simulate payment processing
+    // For now, simulate payment processing
+    // TODO: Integrate with Razorpay
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -73,7 +74,7 @@ const Pricing = () => {
         description: "Welcome to your premium account. Redirecting to dashboard...",
       });
       
-      // Simulate successful subscription
+      // TODO: Update subscription status in database
       setTimeout(() => {
         navigate('/dashboard');
       }, 1000);

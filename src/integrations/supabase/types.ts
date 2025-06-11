@@ -9,7 +9,231 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      generated_resumes: {
+        Row: {
+          created_at: string
+          file_url: string | null
+          id: string
+          job_match_id: string
+          optimized_content: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          job_match_id: string
+          optimized_content: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          job_match_id?: string
+          optimized_content?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_resumes_job_match_id_fkey"
+            columns: ["job_match_id"]
+            isOneToOne: false
+            referencedRelation: "job_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_matches: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          id: string
+          job_description: string | null
+          job_search_id: string
+          job_title: string
+          job_url: string | null
+          location: string | null
+          match_percentage: number | null
+          requirements: Json | null
+          salary_range: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          job_description?: string | null
+          job_search_id: string
+          job_title: string
+          job_url?: string | null
+          location?: string | null
+          match_percentage?: number | null
+          requirements?: Json | null
+          salary_range?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          job_description?: string | null
+          job_search_id?: string
+          job_title?: string
+          job_url?: string | null
+          location?: string | null
+          match_percentage?: number | null
+          requirements?: Json | null
+          salary_range?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_matches_job_search_id_fkey"
+            columns: ["job_search_id"]
+            isOneToOne: false
+            referencedRelation: "job_searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_searches: {
+        Row: {
+          created_at: string
+          id: string
+          resume_id: string | null
+          roadmap: Json | null
+          search_status: string | null
+          selected_job_titles: string[]
+          skill_gaps: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          resume_id?: string | null
+          roadmap?: Json | null
+          search_status?: string | null
+          selected_job_titles: string[]
+          skill_gaps?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          resume_id?: string | null
+          roadmap?: Json | null
+          search_status?: string | null
+          selected_job_titles?: string[]
+          skill_gaps?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_searches_resume_id_fkey"
+            columns: ["resume_id"]
+            isOneToOne: false
+            referencedRelation: "resumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      resumes: {
+        Row: {
+          created_at: string
+          extracted_skills: Json | null
+          file_name: string
+          file_url: string
+          id: string
+          parsed_content: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          extracted_skills?: Json | null
+          file_name: string
+          file_url: string
+          id?: string
+          parsed_content?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          extracted_skills?: Json | null
+          file_name?: string
+          file_url?: string
+          id?: string
+          parsed_content?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          stripe_customer_id: string | null
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

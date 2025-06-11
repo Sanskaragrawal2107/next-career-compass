@@ -3,56 +3,173 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Target, TrendingUp, Download, LogOut } from 'lucide-react';
+import { Upload, FileText, Target, TrendingUp, Download, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, logout, subscription } = useAuth();
+  const { user, profile, subscription, signOut, loading: authLoading } = useAuth();
   const [uploadedResume, setUploadedResume] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [stats, setStats] = useState({
+    resumesAnalyzed: 0,
+    jobMatches: 0,
+    skillsIdentified: 0,
+    roadmapsGenerated: 0,
+  });
 
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       navigate('/');
       return;
     }
     
-    if (!subscription?.subscribed) {
+    if (!authLoading && !subscription?.subscribed) {
       navigate('/pricing');
       return;
     }
-  }, [user, subscription, navigate]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      setUploadedResume(file);
-      toast({
-        title: "Resume uploaded successfully!",
-        description: "We'll analyze your resume and extract skills.",
+    if (user) {
+      fetchUserStats();
+    }
+  }, [user, subscription, authLoading, navigate]);
+
+  const fetchUserStats = async () => {
+    if (!user) return;
+
+    try {
+      // Fetch resume count
+      const { count: resumeCount } = await supabase
+        .from('resumes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Fetch job searches count
+      const { count: jobSearchCount } = await supabase
+        .from('job_searches')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Fetch job matches count
+      const { data: jobMatches } = await supabase
+        .from('job_matches')
+        .select('id, job_search_id')
+        .in('job_search_id', 
+          await supabase
+            .from('job_searches')
+            .select('id')
+            .eq('user_id', user.id)
+            .then(res => res.data?.map(js => js.id) || [])
+        );
+
+      setStats({
+        resumesAnalyzed: resumeCount || 0,
+        jobMatches: jobMatches?.length || 0,
+        skillsIdentified: 0, // Will be calculated from extracted skills
+        roadmapsGenerated: jobSearchCount || 0,
       });
-    } else {
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
       toast({
         title: "Invalid file type",
         description: "Please upload a PDF file.",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      const fileExt = 'pdf';
+      const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
+      
+      // Upload file to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('resumes')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('resumes')
+        .getPublicUrl(fileName);
+
+      // Save resume record to database
+      const { error: dbError } = await supabase
+        .from('resumes')
+        .insert({
+          user_id: user!.id,
+          file_name: file.name,
+          file_url: data.publicUrl,
+          extracted_skills: {},
+          parsed_content: '',
+        });
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      setUploadedResume(file);
+      toast({
+        title: "Resume uploaded successfully!",
+        description: "We'll analyze your resume and extract skills.",
+      });
+
+      // Refresh stats
+      fetchUserStats();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload resume.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/');
   };
 
-  if (!user || !subscription?.subscribed) {
-    return <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-        <p className="mt-2 text-muted-foreground">Loading...</p>
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
       </div>
-    </div>;
+    );
+  }
+
+  if (!user || !subscription?.subscribed) {
+    return null;
   }
 
   return (
@@ -61,12 +178,16 @@ const Dashboard = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user.name || user.email}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, {profile?.full_name || user.email}
+            </h1>
             <p className="text-gray-600 mt-1">Let's boost your career with AI-powered insights</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
-              Plan: <span className="font-semibold text-primary">{subscription.plan || 'Premium'}</span>
+              Plan: <span className="font-semibold text-primary">
+                {subscription.subscription_tier || 'Premium'}
+              </span>
             </div>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
@@ -149,11 +270,12 @@ const Dashboard = () => {
                   onChange={handleFileUpload}
                   className="hidden"
                   id="resume-upload"
+                  disabled={uploading}
                 />
                 <label htmlFor="resume-upload" className="cursor-pointer">
                   <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                   <p className="text-lg font-medium text-gray-900 mb-2">
-                    {uploadedResume ? uploadedResume.name : 'Click to upload your resume'}
+                    {uploading ? 'Uploading...' : uploadedResume ? uploadedResume.name : 'Click to upload your resume'}
                   </p>
                   <p className="text-gray-500">PDF files only, max 10MB</p>
                 </label>
@@ -171,7 +293,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Quick Stats */}
+          {/* Progress Stats */}
           <Card>
             <CardHeader>
               <CardTitle>Your Progress</CardTitle>
@@ -181,19 +303,19 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                   <span className="text-sm font-medium">Resumes Analyzed</span>
-                  <span className="text-xl font-bold text-blue-600">0</span>
+                  <span className="text-xl font-bold text-blue-600">{stats.resumesAnalyzed}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                   <span className="text-sm font-medium">Job Matches Found</span>
-                  <span className="text-xl font-bold text-green-600">0</span>
+                  <span className="text-xl font-bold text-green-600">{stats.jobMatches}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
                   <span className="text-sm font-medium">Skills Identified</span>
-                  <span className="text-xl font-bold text-purple-600">0</span>
+                  <span className="text-xl font-bold text-purple-600">{stats.skillsIdentified}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
                   <span className="text-sm font-medium">Roadmaps Generated</span>
-                  <span className="text-xl font-bold text-orange-600">0</span>
+                  <span className="text-xl font-bold text-orange-600">{stats.roadmapsGenerated}</span>
                 </div>
               </div>
             </CardContent>
