@@ -368,26 +368,10 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="roadmap" className="space-y-6">
-            {roadmapSkills && selectedJobTitles.length > 0 ? (
-              <SkillGapRoadmap 
-                selectedJobTitles={selectedJobTitles}
-                userSkills={roadmapSkills}
-              />
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Skill Gap Roadmap</CardTitle>
-                  <CardDescription>
-                    Complete the AI Analysis and select job titles to generate your personalized learning roadmap
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={() => setActiveTab("analysis")} variant="outline">
-                    Go to AI Analysis
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            <SkillGapRoadmap 
+              selectedJobTitles={selectedJobTitles}
+              userSkills={roadmapSkills}
+            />
           </TabsContent>
         </Tabs>
       </div>

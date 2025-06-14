@@ -34,15 +34,15 @@ interface RoadmapData {
 }
 
 interface SkillGapRoadmapProps {
-  selectedJobTitles: string[];
-  userSkills: {
+  selectedJobTitles?: string[];
+  userSkills?: {
     technical: string[];
     soft: string[];
     experience_years: number;
   };
 }
 
-const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps) => {
+const SkillGapRoadmap = ({ selectedJobTitles = [], userSkills }: SkillGapRoadmapProps) => {
   const { user } = useAuth();
   const [roadmaps, setRoadmaps] = useState<RoadmapData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,10 +58,10 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
   }, [user]);
 
   useEffect(() => {
-    if (selectedJobTitles.length > 0 && !initialLoading) {
+    if (selectedJobTitles.length > 0 && userSkills && !initialLoading) {
       generateRoadmaps();
     }
-  }, [selectedJobTitles, initialLoading]);
+  }, [selectedJobTitles, userSkills, initialLoading]);
 
   useEffect(() => {
     loadCompletedTasks();
@@ -126,6 +126,15 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
   };
 
   const generateRoadmaps = async () => {
+    if (!userSkills) {
+      toast({
+        title: "Missing skills data",
+        description: "Cannot generate roadmap without user skills. Please complete the AI Analysis.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setLoadingProgress(0);
     
@@ -281,13 +290,13 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
             Skill Gap Analysis & Roadmap
           </CardTitle>
           <CardDescription>
-            Select job titles in the AI Analysis tab to generate personalized learning roadmaps
+            Generate personalized learning roadmaps from the 'AI Analysis' tab.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={generateRoadmaps} disabled={selectedJobTitles.length === 0}>
-            Generate Roadmaps
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            Once you complete an analysis for specific job titles, your roadmaps will appear here. Any previously generated roadmaps are also loaded automatically.
+          </p>
         </CardContent>
       </Card>
     );
@@ -328,9 +337,13 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
             onClick={generateRoadmaps} 
             variant="outline" 
             size="sm"
-            disabled={loading || selectedJobTitles.length === 0}
+            disabled={loading || selectedJobTitles.length === 0 || !userSkills}
           >
-            {selectedJobTitles.length === 0 ? 'Select Job Titles First' : 'Generate New Roadmaps'}
+            {!userSkills
+              ? "Complete Analysis to Generate"
+              : selectedJobTitles.length === 0
+              ? 'Select Job Titles in Analysis'
+              : 'Generate New/Update Roadmaps'}
           </Button>
         </CardContent>
       </Card>
