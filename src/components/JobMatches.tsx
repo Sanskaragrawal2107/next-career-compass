@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import { ExternalLink, MapPin, DollarSign, Building, Star, Download } from 'luci
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import { Json } from '@/integrations/supabase/types';
 
 interface JobRequirements {
   required_skills: string[];
@@ -80,7 +78,7 @@ const JobMatches = () => {
         salary_range: match.salary_range,
         job_description: match.job_description,
         job_url: match.job_url,
-        requirements: match.requirements as JobRequirements | null
+        requirements: match.requirements ? match.requirements as unknown as JobRequirements : null
       }));
 
       console.log('Job matches fetched:', transformedMatches.length);
