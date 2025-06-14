@@ -98,7 +98,13 @@ const Dashboard = () => {
         setUploadedResume(resumes[0]);
         // Check if skills exist and are valid (not empty object)
         const skills = resumes[0].extracted_skills;
-        if (skills && typeof skills === 'object' && Object.keys(skills).length > 0 && skills.suggested_job_titles?.length > 0) {
+        if (skills && 
+            typeof skills === 'object' && 
+            !Array.isArray(skills) &&
+            Object.keys(skills).length > 0 && 
+            'suggested_job_titles' in skills &&
+            Array.isArray(skills.suggested_job_titles) &&
+            skills.suggested_job_titles.length > 0) {
           setActiveTab("analysis");
         }
       }
