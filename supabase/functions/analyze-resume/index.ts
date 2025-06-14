@@ -13,65 +13,6 @@ const logStep = (step: string, details?: any) => {
   console.log(`[ANALYZE-RESUME] ${step}${detailsStr}`);
 };
 
-// Function to extract text from various file formats
-async function extractTextFromFile(fileData: Blob, fileName: string): Promise<string> {
-  try {
-    const arrayBuffer = await fileData.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // For PDF files, try to extract readable text
-    if (fileName.toLowerCase().endsWith('.pdf')) {
-      const text = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
-      
-      // Try to find readable text in the PDF
-      const textContent = text
-        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      // If we find substantial readable text, use it
-      if (textContent.length > 100 && !textContent.startsWith('%PDF')) {
-        return textContent;
-      }
-      
-      // If it's a PDF but we can't extract text easily, return a message for Gemini
-      return `This is a PDF file named "${fileName}". The file contains resume information but the text extraction was not successful. Please analyze this as a resume document and extract skills, experience, and job titles based on typical resume content structure.`;
-    }
-    
-    // For Word files (.doc, .docx)
-    if (fileName.toLowerCase().endsWith('.doc') || fileName.toLowerCase().endsWith('.docx')) {
-      const text = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
-      const textContent = text
-        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      if (textContent.length > 50) {
-        return textContent;
-      }
-      
-      return `This is a Word document named "${fileName}". The file contains resume information. Please analyze this as a resume document and extract skills, experience, and job titles based on typical resume content.`;
-    }
-    
-    // For other text-based files
-    const text = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
-    const textContent = text
-      .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    if (textContent.length > 50) {
-      return textContent;
-    }
-    
-    return `This is a resume file named "${fileName}". Please analyze this as a resume document and provide typical skills, experience, and job titles that would be found in a professional resume.`;
-    
-  } catch (error) {
-    console.error('File text extraction error:', error);
-    return `This is a resume file named "${fileName}". There was an error reading the file content, but please analyze this as a resume document and provide typical professional skills, experience estimates, and relevant job titles.`;
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -134,59 +75,81 @@ serve(async (req) => {
     
     logStep("Attempting to download file", { objectPath: objectPathForDownload });
 
-    let resumeContent = "";
-    
+    let fileData;
     try {
-      const { data: fileData, error: downloadError } = await supabaseClient.storage
+      const { data: downloadedFile, error: downloadError } = await supabaseClient.storage
         .from(bucketName)
         .download(objectPathForDownload);
 
       if (downloadError) {
-        logStep("Download failed, using filename-based analysis", { error: downloadError.message, pathAttempted: objectPathForDownload });
-        resumeContent = `Resume file "${resume.file_name}" could not be downloaded. Please analyze this as a typical professional resume and provide relevant skills and job titles.`;
-      } else if (!fileData) {
-        logStep("Download returned no data, using filename-based analysis", { pathAttempted: objectPathForDownload });
-        resumeContent = `Resume file "${resume.file_name}" is empty. Please analyze this as a typical professional resume and provide relevant skills and job titles.`;
-      } else {
-        logStep("File downloaded successfully, extracting content");
-        resumeContent = await extractTextFromFile(fileData, resume.file_name);
-        logStep("Content extraction completed", { contentLength: resumeContent.length, first100Chars: resumeContent.substring(0, 100) });
+        logStep("Download failed", { error: downloadError.message });
+        throw new Error(`Failed to download file: ${downloadError.message}`);
       }
+
+      if (!downloadedFile) {
+        logStep("Download returned no data");
+        throw new Error("File download returned no data");
+      }
+
+      fileData = downloadedFile;
+      logStep("File downloaded successfully", { fileSize: fileData.size, fileType: fileData.type });
     } catch (downloadErr) {
-      logStep("Download or extraction error, using fallback", { error: downloadErr.message || downloadErr });
-      resumeContent = `Resume file "${resume.file_name}" encountered processing issues. Please analyze this as a professional resume and extract typical skills, experience, and job titles.`;
+      logStep("Download error", { error: downloadErr.message || downloadErr });
+      throw new Error(`Error downloading file: ${downloadErr.message || downloadErr}`);
     }
 
-    logStep("Analyzing resume with Gemini");
+    // Convert file to base64 for Gemini
+    const arrayBuffer = await fileData.arrayBuffer();
+    const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    
+    logStep("File converted to base64", { base64Length: base64Data.length });
 
-    // Use Gemini to analyze the resume
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+    // Determine MIME type
+    let mimeType = fileData.type || 'application/pdf';
+    if (resume.file_name.toLowerCase().endsWith('.pdf')) {
+      mimeType = 'application/pdf';
+    } else if (resume.file_name.toLowerCase().endsWith('.docx')) {
+      mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (resume.file_name.toLowerCase().endsWith('.doc')) {
+      mimeType = 'application/msword';
+    }
+
+    logStep("Analyzing document with Gemini", { mimeType });
+
+    // Send the actual file data to Gemini for analysis
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         contents: [{
-          parts: [{
-            text: `You are an expert resume analyzer. Analyze the provided content and extract:
-            1. Technical skills (programming languages, software, tools, technologies)
-            2. Soft skills (communication, leadership, teamwork, etc.)
-            3. Years of experience (estimate based on work history and dates mentioned, if not determinable return 3 as default)
-            4. Suggested job titles based on the skills and experience found (provide at least 3 relevant titles)
-            
-            Return the response in this exact JSON format:
+          parts: [
             {
-              "technical": ["skill1", "skill2", "skill3"],
-              "soft": ["skill1", "skill2", "skill3"],
-              "experience_years": number,
-              "suggested_job_titles": ["title1", "title2", "title3"]
+              text: `You are an expert resume analyzer. Analyze the provided document and extract:
+              1. Technical skills (programming languages, software, tools, technologies)
+              2. Soft skills (communication, leadership, teamwork, etc.)
+              3. Years of experience (estimate based on work history and dates mentioned, if not determinable return 3 as default)
+              4. Suggested job titles based on the skills and experience found (provide at least 3 relevant titles)
+              
+              Return the response in this exact JSON format:
+              {
+                "technical": ["skill1", "skill2", "skill3"],
+                "soft": ["skill1", "skill2", "skill3"],
+                "experience_years": number,
+                "suggested_job_titles": ["title1", "title2", "title3"]
+              }
+              
+              Be specific and accurate. Extract actual skills and experience from the document.
+              Always provide at least 3-5 technical skills, 3-5 soft skills, and 3-5 job titles based on what you find in the document.`
+            },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data
+              }
             }
-            
-            Be specific and accurate. If the content seems limited or unclear, provide reasonable professional defaults.
-            Always provide at least 3-5 technical skills, 3-5 soft skills, and 3-5 job titles.
-            
-            Content to analyze: ${resumeContent}`
-          }]
+          ]
         }],
         generationConfig: {
           temperature: 0.3,
@@ -229,7 +192,7 @@ serve(async (req) => {
     }
     const analysisText = geminiData.candidates[0].content.parts[0].text;
 
-    logStep("Gemini analysis completed", { analysisLength: analysisText.length });
+    logStep("Gemini analysis completed", { analysisLength: analysisText.length, analysisPreview: analysisText.substring(0, 200) });
 
     let extractedSkills;
     try {
@@ -261,14 +224,15 @@ serve(async (req) => {
       technicalCount: extractedSkills.technical.length,
       softCount: extractedSkills.soft.length,
       experienceYears: extractedSkills.experience_years,
-      jobTitlesCount: extractedSkills.suggested_job_titles.length
+      jobTitlesCount: extractedSkills.suggested_job_titles.length,
+      extractedData: extractedSkills
     });
 
     const { error: updateError } = await supabaseClient
       .from("resumes")
       .update({
         extracted_skills: extractedSkills,
-        parsed_content: resumeContent.substring(0, 10000),
+        parsed_content: `Document analyzed by Gemini AI - ${resume.file_name}`,
         updated_at: new Date().toISOString()
       })
       .eq("id", resumeId);
