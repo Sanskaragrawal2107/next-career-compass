@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,18 +8,50 @@ import { Brain, Target, Loader2, CheckCircle, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+interface ExtractedSkillsData {
+  technical: string[];
+  soft: string[];
+  experience_years: number;
+  suggested_job_titles: string[];
+}
+
 interface ResumeAnalysisProps {
   resumeId: string;
+  initialExtractedSkills?: ExtractedSkillsData | null | {}; // Allow {}, null, or actual data
   onAnalysisComplete: () => void;
 }
 
-const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) => {
+const ResumeAnalysis = ({ resumeId, initialExtractedSkills, onAnalysisComplete }: ResumeAnalysisProps) => {
+  // Helper to check if initialExtractedSkills are valid and not empty
+  const isValidInitialSkills = (skills: any): skills is ExtractedSkillsData => {
+    return skills && 
+           typeof skills === 'object' && // Ensure it's an object
+           Object.keys(skills).length > 0 && // Ensure it's not an empty object {}
+           Array.isArray(skills.suggested_job_titles) &&
+           skills.suggested_job_titles.length > 0;
+  };
+  
+  const hasValidInitialSkills = isValidInitialSkills(initialExtractedSkills);
+
   const [analyzing, setAnalyzing] = useState(false);
-  const [analyzed, setAnalyzed] = useState(false);
-  const [extractedSkills, setExtractedSkills] = useState<any>(null);
+  const [analyzed, setAnalyzed] = useState<boolean>(hasValidInitialSkills);
+  const [extractedSkills, setExtractedSkills] = useState<ExtractedSkillsData | null>(
+    hasValidInitialSkills ? initialExtractedSkills : null
+  );
   const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
   const [preferredLocation, setPreferredLocation] = useState('');
   const [generatingMatches, setGeneratingMatches] = useState(false);
+
+  // If initial skills are provided and valid, pre-populate selected job titles
+  // This useEffect handles the case where initialExtractedSkills might be passed but selectedJobTitles hasn't been set.
+  useEffect(() => {
+    if (hasValidInitialSkills && extractedSkills && extractedSkills.suggested_job_titles.length > 0 && selectedJobTitles.length === 0) {
+      // Optionally, pre-select some or all job titles if desired, or leave empty
+      // For now, we won't pre-select to let the user choose.
+      // If you want to pre-select, for example, the first one:
+      // setSelectedJobTitles([extractedSkills.suggested_job_titles[0]]);
+    }
+  }, [hasValidInitialSkills, extractedSkills, selectedJobTitles.length]);
 
   const handleAnalyzeResume = async () => {
     setAnalyzing(true);
@@ -33,12 +64,12 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data.success && data.extracted_skills) {
         setExtractedSkills(data.extracted_skills);
         setAnalyzed(true);
         toast({
           title: "Resume analyzed successfully!",
-          description: `Found ${data.extracted_skills.technical.length + data.extracted_skills.soft.length} skills and ${data.suggested_job_titles.length} job suggestions.`,
+          description: `Found ${data.extracted_skills.technical.length + data.extracted_skills.soft.length} skills and ${data.extracted_skills.suggested_job_titles.length} job suggestions.`,
         });
       } else {
         throw new Error(data.error || 'Analysis failed');
@@ -143,6 +174,25 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
     );
   }
 
+  // Ensure extractedSkills is not null before trying to access its properties
+  if (!extractedSkills) {
+    // This case should ideally not be reached if 'analyzed' is true without 'extractedSkills'
+    // But as a fallback, offer to analyze again or show an error.
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Analysis Data Missing</CardTitle>
+                <CardDescription>Extracted skills data is not available. Please try analyzing again.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={() => { setAnalyzed(false); handleAnalyzeResume(); }} className="w-full">
+                    Re-analyze Resume
+                </Button>
+            </CardContent>
+        </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Skills Analysis Results */}
@@ -153,7 +203,7 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
             Skills Extracted
           </CardTitle>
           <CardDescription>
-            AI identified {extractedSkills.technical.length + extractedSkills.soft.length} skills from your resume
+            AI identified {(extractedSkills.technical?.length || 0) + (extractedSkills.soft?.length || 0)} skills from your resume
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,24 +211,24 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
             <div>
               <h4 className="font-medium mb-2">Technical Skills</h4>
               <div className="flex flex-wrap gap-2">
-                {extractedSkills.technical.map((skill: string, index: number) => (
+                {extractedSkills.technical?.map((skill: string, index: number) => (
                   <Badge key={index} variant="secondary">{skill}</Badge>
-                ))}
+                )) || <p className="text-sm text-gray-500">No technical skills found.</p>}
               </div>
             </div>
             
             <div>
               <h4 className="font-medium mb-2">Soft Skills</h4>
               <div className="flex flex-wrap gap-2">
-                {extractedSkills.soft.map((skill: string, index: number) => (
+                {extractedSkills.soft?.map((skill: string, index: number) => (
                   <Badge key={index} variant="outline">{skill}</Badge>
-                ))}
+                )) || <p className="text-sm text-gray-500">No soft skills found.</p>}
               </div>
             </div>
 
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Experience Level:</strong> {extractedSkills.experience_years} years
+                <strong>Experience Level:</strong> {extractedSkills.experience_years !== undefined ? `${extractedSkills.experience_years} years` : 'Not specified'}
               </p>
             </div>
           </div>
@@ -220,7 +270,7 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
             {/* Job Titles */}
             <div className="space-y-3">
               <h4 className="font-medium">Job Titles</h4>
-              {extractedSkills.suggested_job_titles.map((jobTitle: string, index: number) => (
+              {extractedSkills.suggested_job_titles?.map((jobTitle: string, index: number) => (
                 <div key={index} className="flex items-center space-x-2">
                   <Checkbox
                     id={`job-${index}`}
@@ -231,7 +281,7 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
                     {jobTitle}
                   </label>
                 </div>
-              ))}
+              )) || <p className="text-sm text-gray-500">No job titles suggested. Try re-analyzing.</p>}
             </div>
 
             <Button 

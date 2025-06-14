@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,7 +36,7 @@ const Dashboard = () => {
       fetchUserStats();
       fetchLatestResume();
     }
-  }, [user, subscription, authLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   const fetchUserStats = async () => {
     if (!user) return;
@@ -335,7 +334,8 @@ const Dashboard = () => {
           <TabsContent value="analysis" className="space-y-6">
             {uploadedResume && (
               <ResumeAnalysis 
-                resumeId={uploadedResume.id} 
+                resumeId={uploadedResume.id}
+                initialExtractedSkills={uploadedResume.extracted_skills} {/* Pass existing skills */}
                 onAnalysisComplete={handleAnalysisComplete}
               />
             )}
