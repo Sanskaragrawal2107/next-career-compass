@@ -49,16 +49,60 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [activeRoadmap, setActiveRoadmap] = useState<string>('');
   const [completedTasks, setCompletedTasks] = useState<{ [key: string]: boolean }>({});
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
-    if (selectedJobTitles.length > 0) {
+    if (user) {
+      loadExistingRoadmaps();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (selectedJobTitles.length > 0 && !initialLoading) {
       generateRoadmaps();
     }
-  }, [selectedJobTitles]);
+  }, [selectedJobTitles, initialLoading]);
 
   useEffect(() => {
     loadCompletedTasks();
   }, [user]);
+
+  const loadExistingRoadmaps = async () => {
+    if (!user) return;
+
+    try {
+      console.log('Loading existing roadmaps for user:', user.id);
+      
+      const { data: existingRoadmaps, error } = await supabase
+        .from('skill_roadmaps')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (existingRoadmaps && existingRoadmaps.length > 0) {
+        const formattedRoadmaps = existingRoadmaps.map(roadmap => ({
+          jobTitle: roadmap.job_title,
+          skillGaps: roadmap.skill_gaps || [],
+          roadmap: roadmap.roadmap_data || [],
+          totalDays: roadmap.total_days || 30,
+          estimatedWeeks: roadmap.estimated_weeks || 4
+        }));
+
+        setRoadmaps(formattedRoadmaps);
+        if (formattedRoadmaps.length > 0) {
+          setActiveRoadmap(formattedRoadmaps[0].jobTitle);
+        }
+        
+        console.log('Loaded existing roadmaps:', formattedRoadmaps.length);
+      }
+    } catch (error) {
+      console.error('Error loading existing roadmaps:', error);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   const loadCompletedTasks = async () => {
     if (!user) return;
@@ -115,8 +159,8 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
           setActiveRoadmap(data.roadmaps[0].jobTitle);
         }
         toast({
-          title: "Roadmaps generated!",
-          description: `Created personalized learning paths for ${data.roadmaps.length} job role(s).`,
+          title: "Roadmaps ready!",
+          description: data.message,
         });
       } else {
         throw new Error(data.error || 'Roadmap generation failed');
@@ -194,6 +238,17 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
     }, 0);
     return totalTasks > 0 ? (completedTasksCount / totalTasks) * 100 : 0;
   };
+
+  if (initialLoading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Loading existing roadmaps...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (
@@ -273,9 +328,9 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
             onClick={generateRoadmaps} 
             variant="outline" 
             size="sm"
-            disabled={loading}
+            disabled={loading || selectedJobTitles.length === 0}
           >
-            Regenerate Roadmaps
+            {selectedJobTitles.length === 0 ? 'Select Job Titles First' : 'Generate New Roadmaps'}
           </Button>
         </CardContent>
       </Card>
