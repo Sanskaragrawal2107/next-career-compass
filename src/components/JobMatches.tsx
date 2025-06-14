@@ -7,21 +7,24 @@ import { ExternalLink, MapPin, DollarSign, Building, Star, Download } from 'luci
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { Json } from '@/integrations/supabase/types';
+
+interface JobRequirements {
+  required_skills: string[];
+  preferred_skills: string[];
+  experience_years: number;
+}
 
 interface JobMatch {
   id: string;
   job_title: string;
-  company_name: string;
-  location: string;
-  match_percentage: number;
-  salary_range: string;
-  job_description: string;
-  job_url: string;
-  requirements: {
-    required_skills: string[];
-    preferred_skills: string[];
-    experience_years: number;
-  };
+  company_name: string | null;
+  location: string | null;
+  match_percentage: number | null;
+  salary_range: string | null;
+  job_description: string | null;
+  job_url: string | null;
+  requirements: JobRequirements | null;
 }
 
 const JobMatches = () => {
@@ -67,8 +70,21 @@ const JobMatches = () => {
 
       if (matchError) throw matchError;
 
-      console.log('Job matches fetched:', matches?.length || 0);
-      setJobMatches(matches || []);
+      // Transform the data to match our interface
+      const transformedMatches: JobMatch[] = (matches || []).map(match => ({
+        id: match.id,
+        job_title: match.job_title,
+        company_name: match.company_name,
+        location: match.location,
+        match_percentage: match.match_percentage,
+        salary_range: match.salary_range,
+        job_description: match.job_description,
+        job_url: match.job_url,
+        requirements: match.requirements as JobRequirements | null
+      }));
+
+      console.log('Job matches fetched:', transformedMatches.length);
+      setJobMatches(transformedMatches);
     } catch (error: any) {
       console.error('Error fetching job matches:', error);
       toast({
@@ -81,7 +97,8 @@ const JobMatches = () => {
     }
   };
 
-  const getMatchColor = (percentage: number) => {
+  const getMatchColor = (percentage: number | null) => {
+    if (!percentage) return 'text-gray-600 bg-gray-50 border-gray-200';
     if (percentage >= 90) return 'text-green-600 bg-green-50 border-green-200';
     if (percentage >= 80) return 'text-blue-600 bg-blue-50 border-blue-200';
     if (percentage >= 70) return 'text-orange-600 bg-orange-50 border-orange-200';
@@ -141,12 +158,12 @@ const JobMatches = () => {
                   <CardTitle className="text-xl">{job.job_title}</CardTitle>
                   <CardDescription className="flex items-center mt-1">
                     <Building className="w-4 h-4 mr-1" />
-                    {job.company_name}
+                    {job.company_name || 'Company Name'}
                   </CardDescription>
                 </div>
                 <div className={`px-3 py-1 rounded-full border text-sm font-medium ${getMatchColor(job.match_percentage)}`}>
                   <Star className="w-3 h-3 inline mr-1" />
-                  {job.match_percentage}% match
+                  {job.match_percentage || 0}% match
                 </div>
               </div>
             </CardHeader>
@@ -155,41 +172,43 @@ const JobMatches = () => {
               <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                 <div className="flex items-center">
                   <MapPin className="w-4 h-4 mr-1" />
-                  {job.location}
+                  {job.location || 'Location not specified'}
                 </div>
                 <div className="flex items-center">
                   <DollarSign className="w-4 h-4 mr-1" />
-                  {job.salary_range}
+                  {job.salary_range || 'Salary not specified'}
                 </div>
               </div>
 
               <p className="text-gray-700 leading-relaxed">
-                {job.job_description}
+                {job.job_description || 'Job description not available'}
               </p>
 
-              <div className="space-y-3">
-                <div>
-                  <h4 className="font-medium text-sm mb-2">Required Skills</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {job.requirements.required_skills.map((skill, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
+              {job.requirements && (
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">Required Skills</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {job.requirements.required_skills?.map((skill, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {skill}
+                        </Badge>
+                      )) || <span className="text-gray-500 text-sm">No requirements specified</span>}
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <h4 className="font-medium text-sm mb-2">Preferred Skills</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {job.requirements.preferred_skills.map((skill, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">Preferred Skills</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {job.requirements.preferred_skills?.map((skill, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {skill}
+                        </Badge>
+                      )) || <span className="text-gray-500 text-sm">No preferences specified</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1">
@@ -197,7 +216,7 @@ const JobMatches = () => {
                   Generate Optimized Resume
                 </Button>
                 <Button variant="outline" asChild>
-                  <a href={job.job_url} target="_blank" rel="noopener noreferrer">
+                  <a href={job.job_url || '#'} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     View Job
                   </a>
