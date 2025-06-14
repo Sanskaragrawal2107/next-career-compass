@@ -96,7 +96,9 @@ const Dashboard = () => {
       
       if (resumes && resumes.length > 0) {
         setUploadedResume(resumes[0]);
-        if (resumes[0].extracted_skills) {
+        // Check if skills exist and are valid (not empty object)
+        const skills = resumes[0].extracted_skills;
+        if (skills && typeof skills === 'object' && Object.keys(skills).length > 0 && skills.suggested_job_titles?.length > 0) {
           setActiveTab("analysis");
         }
       }
@@ -336,7 +338,7 @@ const Dashboard = () => {
             {uploadedResume && (
               <ResumeAnalysis 
                 resumeId={uploadedResume.id}
-                initialExtractedSkills={uploadedResume.extracted_skills} {/* Pass existing skills */}
+                initialExtractedSkills={uploadedResume.extracted_skills}
                 onAnalysisComplete={handleAnalysisComplete}
               />
             )}
