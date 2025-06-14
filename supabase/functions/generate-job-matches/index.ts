@@ -20,9 +20,9 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiApiKey) {
-      throw new Error("Gemini API key not configured");
+    const adzunaApiKey = Deno.env.get('ADZUNA_API_KEY');
+    if (!adzunaApiKey) {
+      throw new Error("Adzuna API key not configured");
     }
 
     const supabaseClient = createClient(
@@ -88,7 +88,7 @@ serve(async (req) => {
     
     logStep("Job search created", { jobSearchId: jobSearch.id });
 
-    // Generate personalized job matches using Gemini
+    // Extract skills and experience data
     const skillsData = resume.extracted_skills;
     const technicalSkills = skillsData.technical || [];
     const softSkills = skillsData.soft || [];
@@ -97,140 +97,134 @@ serve(async (req) => {
     const jobMatches = [];
 
     for (const jobTitle of selectedJobTitles) {
-      logStep("Generating matches for job title", { jobTitle });
-
-      // Create a prompt for Gemini to generate realistic job matches
-      const prompt = `Generate 3-4 realistic job postings for the position "${jobTitle}" that would be a good match for a candidate with the following profile:
-
-Technical Skills: ${technicalSkills.join(', ')}
-Soft Skills: ${softSkills.join(', ')}
-Experience: ${experienceYears} years
-
-For each job posting, provide a JSON object with the following structure:
-{
-  "company_name": "realistic company name",
-  "location": "city, state or remote",
-  "job_description": "detailed job description that matches the candidate's skills (2-3 sentences)",
-  "salary_range": "realistic salary range for this role and experience level",
-  "match_percentage": number between 75-95 (how well this job matches the candidate),
-  "requirements": {
-    "required_skills": [array of 3-5 required skills that overlap with candidate's skills],
-    "preferred_skills": [array of 2-4 preferred skills],
-    "experience_years": number (years of experience required)
-  },
-  "job_url": "https://careers.[company-name].com/jobs/[job-title-slug]"
-}
-
-Return an array of 3-4 such job objects. Make sure the jobs are realistic and the match percentages accurately reflect how well the candidate's skills align with the job requirements.`;
+      logStep("Searching for real jobs", { jobTitle });
 
       try {
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 2048,
+        // Create search query with skills for better matching
+        const skillsQuery = technicalSkills.slice(0, 3).join(' OR ');
+        const searchQuery = `${jobTitle} ${skillsQuery}`;
+
+        // Search for jobs using Adzuna API
+        const adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaApiKey}&app_key=${adzunaApiKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=20&sort_by=relevance`;
+        
+        logStep("Calling Adzuna API", { url: adzunaUrl.replace(adzunaApiKey, '[HIDDEN]') });
+
+        const adzunaResponse = await fetch(adzunaUrl);
+        
+        if (!adzunaResponse.ok) {
+          throw new Error(`Adzuna API error: ${adzunaResponse.status}`);
+        }
+
+        const adzunaData = await adzunaResponse.json();
+        const jobs = adzunaData.results || [];
+
+        logStep("Adzuna jobs received", { count: jobs.length });
+
+        // Filter and process jobs
+        for (const job of jobs.slice(0, 4)) { // Limit to 4 jobs per title
+          try {
+            // Calculate match percentage based on skills overlap
+            const jobDescription = (job.description || '').toLowerCase();
+            const jobTitle_lower = (job.title || '').toLowerCase();
+            
+            let matchScore = 0;
+            let totalSkills = technicalSkills.length + softSkills.length;
+            
+            // Check technical skills
+            for (const skill of technicalSkills) {
+              if (jobDescription.includes(skill.toLowerCase()) || jobTitle_lower.includes(skill.toLowerCase())) {
+                matchScore += 2; // Technical skills weighted more
+              }
             }
-          }),
+            
+            // Check soft skills
+            for (const skill of softSkills) {
+              if (jobDescription.includes(skill.toLowerCase()) || jobTitle_lower.includes(skill.toLowerCase())) {
+                matchScore += 1;
+              }
+            }
+            
+            // Calculate percentage (minimum 75% for inclusion)
+            const maxPossibleScore = (technicalSkills.length * 2) + (softSkills.length * 1);
+            const matchPercentage = Math.min(95, Math.max(75, Math.floor((matchScore / maxPossibleScore) * 100)));
+            
+            // Only include jobs with at least 75% match
+            if (matchPercentage >= 75) {
+              // Extract salary information
+              let salaryRange = 'Salary not specified';
+              if (job.salary_min && job.salary_max) {
+                salaryRange = `$${Math.floor(job.salary_min).toLocaleString()} - $${Math.floor(job.salary_max).toLocaleString()}`;
+              } else if (job.salary_min) {
+                salaryRange = `From $${Math.floor(job.salary_min).toLocaleString()}`;
+              }
+
+              // Create requirements object from job description
+              const requirements = {
+                required_skills: technicalSkills.filter(skill => 
+                  jobDescription.includes(skill.toLowerCase())
+                ).slice(0, 5),
+                preferred_skills: [...technicalSkills, ...softSkills].filter(skill => 
+                  jobDescription.includes(skill.toLowerCase())
+                ).slice(0, 4),
+                experience_years: experienceYears
+              };
+
+              const jobMatch = {
+                job_search_id: jobSearch.id,
+                job_title: job.title || jobTitle,
+                company_name: job.company?.display_name || 'Company',
+                location: job.location?.display_name || 'Location not specified',
+                match_percentage: matchPercentage,
+                salary_range: salaryRange,
+                job_description: job.description?.substring(0, 500) || 'Job description not available',
+                job_url: job.redirect_url || '#',
+                requirements: requirements
+              };
+              
+              jobMatches.push(jobMatch);
+              logStep("Job match added", { 
+                title: jobMatch.job_title, 
+                company: jobMatch.company_name,
+                matchPercentage: matchPercentage 
+              });
+            }
+          } catch (jobError) {
+            logStep("Error processing individual job", { error: jobError.message });
+            // Continue processing other jobs
+          }
+        }
+
+      } catch (adzunaError) {
+        logStep("Adzuna API error for job title", { 
+          jobTitle, 
+          error: adzunaError.message 
         });
-
-        if (!geminiResponse.ok) {
-          throw new Error(`Gemini API error: ${geminiResponse.status}`);
-        }
-
-        const geminiData = await geminiResponse.json();
-        const responseText = geminiData.candidates[0].content.parts[0].text;
-        
-        logStep("Gemini response received", { responseLength: responseText.length });
-
-        // Parse the JSON from Gemini response
-        let generatedJobs = [];
-        try {
-          // Extract JSON from the response (handle markdown code blocks)
-          const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```|(\[[\s\S]*\])/);
-          let jsonText = responseText;
-          if (jsonMatch) {
-            jsonText = jsonMatch[1] || jsonMatch[2];
-          }
-          
-          generatedJobs = JSON.parse(jsonText);
-          
-          if (!Array.isArray(generatedJobs)) {
-            throw new Error("Expected array of jobs");
-          }
-        } catch (parseError) {
-          logStep("Failed to parse Gemini response, using fallback", { error: parseError.message });
-          // Fallback to a single realistic job if parsing fails
-          generatedJobs = [{
-            company_name: "TechCorp Solutions",
-            location: "Remote",
-            job_description: `We are seeking a talented ${jobTitle} to join our dynamic team. This role involves working with modern technologies including ${technicalSkills.slice(0, 3).join(', ')} and requires strong ${softSkills.slice(0, 2).join(' and ')} skills.`,
-            salary_range: `$${Math.floor((experienceYears * 15 + 60))}k - $${Math.floor((experienceYears * 20 + 80))}k`,
-            match_percentage: 85,
-            requirements: {
-              required_skills: technicalSkills.slice(0, 4),
-              preferred_skills: technicalSkills.slice(4, 7),
-              experience_years: Math.max(experienceYears - 1, 1)
-            },
-            job_url: `https://careers.techcorp.com/jobs/${jobTitle.toLowerCase().replace(/\s+/g, '-')}`
-          }];
-        }
-
-        // Process each generated job and add to our matches
-        for (const job of generatedJobs) {
-          const jobMatch = {
-            job_search_id: jobSearch.id,
-            job_title: jobTitle,
-            company_name: job.company_name || "Company Name",
-            location: job.location || "Location TBD",
-            match_percentage: Math.min(Math.max(job.match_percentage || 80, 75), 100),
-            salary_range: job.salary_range || `$${Math.floor((experienceYears * 15 + 60))}k - $${Math.floor((experienceYears * 20 + 80))}k`,
-            job_description: job.job_description || `Seeking a ${jobTitle} with relevant experience and skills.`,
-            job_url: job.job_url || `https://careers.company.com/jobs/${jobTitle.replace(/\s+/g, '-').toLowerCase()}`,
-            requirements: job.requirements || {
-              required_skills: technicalSkills.slice(0, 3),
-              preferred_skills: technicalSkills.slice(3, 6),
-              experience_years: experienceYears
-            }
-          };
-          
-          jobMatches.push(jobMatch);
-        }
-
-      } catch (geminiError) {
-        logStep("Gemini error, using fallback job", { error: geminiError.message });
-        // Fallback job if Gemini fails
-        const fallbackJob = {
-          job_search_id: jobSearch.id,
-          job_title: jobTitle,
-          company_name: "Growing Tech Company",
-          location: "Remote / Hybrid",
-          match_percentage: 78,
-          salary_range: `$${Math.floor((experienceYears * 15 + 60))}k - $${Math.floor((experienceYears * 20 + 80))}k`,
-          job_description: `We are looking for a skilled ${jobTitle} to join our team. The ideal candidate should have experience with ${technicalSkills.slice(0, 3).join(', ')} and demonstrate strong ${softSkills.slice(0, 2).join(' and ')} abilities.`,
-          job_url: `https://careers.company.com/jobs/${jobTitle.replace(/\s+/g, '-').toLowerCase()}`,
-          requirements: {
-            required_skills: technicalSkills.slice(0, Math.min(4, technicalSkills.length)),
-            preferred_skills: technicalSkills.slice(4, Math.min(7, technicalSkills.length)),
-            experience_years: Math.max(experienceYears - 1, 1)
-          }
-        };
-        
-        jobMatches.push(fallbackJob);
+        // Continue with next job title
       }
     }
 
-    logStep("Generated personalized job matches", { count: jobMatches.length });
+    logStep("Total job matches found", { count: jobMatches.length });
+
+    if (jobMatches.length === 0) {
+      // Update job search status to completed but with no matches
+      await supabaseClient
+        .from("job_searches")
+        .update({ 
+          search_status: "completed",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", jobSearch.id);
+
+      return new Response(JSON.stringify({
+        success: true,
+        job_search_id: jobSearch.id,
+        matches_found: 0,
+        message: "No matching jobs found. Try broadening your search criteria or updating your skills."
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     // Insert job matches into database
     const { error: insertError } = await supabaseClient
@@ -256,7 +250,7 @@ Return an array of 3-4 such job objects. Make sure the jobs are realistic and th
       success: true,
       job_search_id: jobSearch.id,
       matches_found: jobMatches.length,
-      message: "Personalized job matches generated successfully"
+      message: `Found ${jobMatches.length} real job opportunities matching your profile`
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
