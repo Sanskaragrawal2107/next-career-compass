@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -104,46 +105,90 @@ serve(async (req) => {
       logStep("Searching for real jobs", { jobTitle });
 
       try {
-        // Create search query with skills for better matching
-        const skillsQuery = technicalSkills.slice(0, 3).join(' ');
-        const searchQuery = `${jobTitle} ${skillsQuery}`;
+        // Try multiple search strategies to find jobs
+        const searchStrategies = [
+          jobTitle, // Just the job title
+          jobTitle.replace(/\s+/g, '+'), // URL encoded spaces
+          jobTitle.split(' ')[0], // First word only
+          `${jobTitle} entry level`, // Add entry level for junior positions
+        ];
 
-        // Build Adzuna API URL with correct credentials
-        let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=20&sort_by=relevance`;
+        let jobs = [];
         
-        // Add location filter if provided
-        if (preferredLocation && preferredLocation.trim() !== '') {
-          adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
+        for (const searchQuery of searchStrategies) {
+          // Build Adzuna API URL with correct credentials
+          let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=50&sort_by=relevance`;
+          
+          // Add location filter if provided
+          if (preferredLocation && preferredLocation.trim() !== '') {
+            adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
+          }
+          
+          logStep("Calling Adzuna API", { 
+            strategy: searchQuery,
+            url: adzunaUrl.replace(adzunaAppKey, '[HIDDEN]'),
+            location: preferredLocation || 'All locations'
+          });
+
+          const adzunaResponse = await fetch(adzunaUrl);
+          
+          if (!adzunaResponse.ok) {
+            const errorText = await adzunaResponse.text();
+            logStep("Adzuna API error details", { 
+              status: adzunaResponse.status, 
+              statusText: adzunaResponse.statusText,
+              error: errorText,
+              strategy: searchQuery
+            });
+            continue; // Try next strategy
+          }
+
+          const adzunaData = await adzunaResponse.json();
+          const searchJobs = adzunaData.results || [];
+
+          logStep("Adzuna jobs received", { 
+            count: searchJobs.length,
+            strategy: searchQuery,
+            totalCount: adzunaData.count || 0
+          });
+
+          if (searchJobs.length > 0) {
+            jobs = searchJobs;
+            break; // Found jobs, stop trying other strategies
+          }
         }
-        
-        logStep("Calling Adzuna API", { 
-          url: adzunaUrl.replace(adzunaAppKey, '[HIDDEN]'),
-          query: searchQuery,
-          location: preferredLocation || 'All locations'
-        });
 
-        const adzunaResponse = await fetch(adzunaUrl);
-        
-        if (!adzunaResponse.ok) {
-          const errorText = await adzunaResponse.text();
-          logStep("Adzuna API error details", { status: adzunaResponse.status, error: errorText });
-          throw new Error(`Adzuna API error: ${adzunaResponse.status} - ${errorText}`);
+        // If still no jobs found, try a very broad search
+        if (jobs.length === 0) {
+          const broadTerms = ['marketing', 'assistant', 'coordinator', 'specialist', 'manager'];
+          const relevantTerm = broadTerms.find(term => 
+            jobTitle.toLowerCase().includes(term)
+          ) || 'entry level';
+
+          let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(relevantTerm)}&results_per_page=50&sort_by=relevance`;
+          
+          if (preferredLocation && preferredLocation.trim() !== '') {
+            adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
+          }
+
+          logStep("Trying broad search", { term: relevantTerm });
+
+          const adzunaResponse = await fetch(adzunaUrl);
+          if (adzunaResponse.ok) {
+            const adzunaData = await adzunaResponse.json();
+            jobs = adzunaData.results || [];
+            logStep("Broad search results", { count: jobs.length });
+          }
         }
 
-        const adzunaData = await adzunaResponse.json();
-        const jobs = adzunaData.results || [];
-
-        logStep("Adzuna jobs received", { count: jobs.length });
-
-        // Filter and process jobs
-        for (const job of jobs.slice(0, 4)) { // Limit to 4 jobs per title
+        // Process found jobs
+        for (const job of jobs.slice(0, 5)) { // Limit to 5 jobs per title
           try {
             // Calculate match percentage based on skills overlap
             const jobDescription = (job.description || '').toLowerCase();
             const jobTitle_lower = (job.title || '').toLowerCase();
             
             let matchScore = 0;
-            let totalSkills = technicalSkills.length + softSkills.length;
             
             // Check technical skills
             for (const skill of technicalSkills) {
@@ -159,51 +204,51 @@ serve(async (req) => {
               }
             }
             
-            // Calculate percentage (minimum 60% for inclusion to get more matches)
+            // Calculate percentage (minimum 60% for inclusion)
             const maxPossibleScore = (technicalSkills.length * 2) + (softSkills.length * 1);
-            let matchPercentage = maxPossibleScore > 0 ? Math.floor((matchScore / maxPossibleScore) * 100) : 75;
+            let matchPercentage = maxPossibleScore > 0 ? Math.floor((matchScore / maxPossibleScore) * 100) : 70;
+            
+            // Ensure minimum match percentage for display
             matchPercentage = Math.min(95, Math.max(60, matchPercentage));
             
-            // Only include jobs with at least 60% match
-            if (matchPercentage >= 60) {
-              // Extract salary information
-              let salaryRange = 'Salary not specified';
-              if (job.salary_min && job.salary_max) {
-                salaryRange = `$${Math.floor(job.salary_min).toLocaleString()} - $${Math.floor(job.salary_max).toLocaleString()}`;
-              } else if (job.salary_min) {
-                salaryRange = `From $${Math.floor(job.salary_min).toLocaleString()}`;
-              }
-
-              // Create requirements object from job description
-              const requirements = {
-                required_skills: technicalSkills.filter(skill => 
-                  jobDescription.includes(skill.toLowerCase())
-                ).slice(0, 5),
-                preferred_skills: [...technicalSkills, ...softSkills].filter(skill => 
-                  jobDescription.includes(skill.toLowerCase())
-                ).slice(0, 4),
-                experience_years: experienceYears
-              };
-
-              const jobMatch = {
-                job_search_id: jobSearch.id,
-                job_title: job.title || jobTitle,
-                company_name: job.company?.display_name || 'Company',
-                location: job.location?.display_name || 'Location not specified',
-                match_percentage: matchPercentage,
-                salary_range: salaryRange,
-                job_description: job.description?.substring(0, 500) || 'Job description not available',
-                job_url: job.redirect_url || '#',
-                requirements: requirements
-              };
-              
-              jobMatches.push(jobMatch);
-              logStep("Job match added", { 
-                title: jobMatch.job_title, 
-                company: jobMatch.company_name,
-                matchPercentage: matchPercentage 
-              });
+            // Extract salary information
+            let salaryRange = 'Salary not specified';
+            if (job.salary_min && job.salary_max) {
+              salaryRange = `$${Math.floor(job.salary_min).toLocaleString()} - $${Math.floor(job.salary_max).toLocaleString()}`;
+            } else if (job.salary_min) {
+              salaryRange = `From $${Math.floor(job.salary_min).toLocaleString()}`;
             }
+
+            // Create requirements object from job description
+            const requirements = {
+              required_skills: technicalSkills.filter(skill => 
+                jobDescription.includes(skill.toLowerCase())
+              ).slice(0, 5),
+              preferred_skills: [...technicalSkills, ...softSkills].filter(skill => 
+                jobDescription.includes(skill.toLowerCase())
+              ).slice(0, 4),
+              experience_years: experienceYears
+            };
+
+            const jobMatch = {
+              job_search_id: jobSearch.id,
+              job_title: job.title || jobTitle,
+              company_name: job.company?.display_name || 'Company',
+              location: job.location?.display_name || 'Location not specified',
+              match_percentage: matchPercentage,
+              salary_range: salaryRange,
+              job_description: job.description?.substring(0, 500) || 'Job description not available',
+              job_url: job.redirect_url || '#',
+              requirements: requirements
+            };
+            
+            jobMatches.push(jobMatch);
+            logStep("Job match added", { 
+              title: jobMatch.job_title, 
+              company: jobMatch.company_name,
+              matchPercentage: matchPercentage 
+            });
+
           } catch (jobError) {
             logStep("Error processing individual job", { error: jobError.message });
             // Continue processing other jobs
@@ -235,7 +280,7 @@ serve(async (req) => {
         success: true,
         job_search_id: jobSearch.id,
         matches_found: 0,
-        message: "No matching jobs found. Try broadening your search criteria or updating your skills."
+        message: "No matching jobs found. Try broadening your search criteria or different job titles."
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
