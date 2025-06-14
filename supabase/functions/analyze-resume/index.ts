@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -88,52 +87,63 @@ serve(async (req) => {
 
     logStep("Fetching resume", { resumeId });
 
-    // Get resume from database
     const { data: resume, error: resumeError } = await supabaseClient
       .from("resumes")
-      .select("*")
+      .select("id, user_id, file_name, file_url, created_at, updated_at, extracted_skills, parsed_content") // Explicitly list columns
       .eq("id", resumeId)
       .eq("user_id", user.id)
       .single();
 
     if (resumeError || !resume) {
-      throw new Error("Resume not found or access denied");
+      throw new Error(`Resume not found or access denied: ${resumeError?.message || 'No resume object'}`);
     }
 
-    logStep("Resume found", { fileName: resume.file_name });
+    logStep("Resume found", { originalFileName: resume.file_name, fileUrl: resume.file_url });
 
-    // Extract filename from the file_url
-    const fileUrl = resume.file_url;
-    const fileName = fileUrl.split('/').pop() || resume.file_name;
+    // Correctly extract the object path from the public file_url for download
+    // Example file_url: https://<project-ref>.supabase.co/storage/v1/object/public/resumes/user-id/timestamp.pdf
+    // We need "user-id/timestamp.pdf" for the download path
+    const bucketName = "resumes"; // Assuming the bucket name is 'resumes'
+    const urlParts = resume.file_url.split(`/storage/v1/object/public/${bucketName}/`);
+    let objectPathForDownload = "";
+    if (urlParts.length > 1) {
+      objectPathForDownload = urlParts[1];
+    } else {
+      // Fallback or error if path extraction fails - though this shouldn't happen with valid URLs
+      logStep("Error extracting object path from file_url", { fileUrl: resume.file_url });
+      throw new Error("Could not determine file path for download from file_url.");
+    }
     
-    logStep("Attempting to download file", { fileName, fileUrl });
+    logStep("Attempting to download file", { objectPath: objectPathForDownload });
 
     let resumeContent = "";
     
-    // Try to download the resume file
     try {
       const { data: fileData, error: downloadError } = await supabaseClient.storage
-        .from("resumes")
-        .download(fileName);
+        .from(bucketName) // Use the bucket name variable
+        .download(objectPathForDownload);
 
       if (downloadError) {
-        logStep("Download failed, using fallback content", { error: downloadError.message });
-        resumeContent = "Unable to download PDF file. Please ensure the file was uploaded correctly.";
-      } else {
+        logStep("Download failed, using fallback content", { error: downloadError.message, pathAttempted: objectPathForDownload });
+        resumeContent = "Unable to download PDF file. Please ensure the file was uploaded correctly and is accessible.";
+      } else if (!fileData) {
+        logStep("Download returned no data, using fallback content", { pathAttempted: objectPathForDownload });
+        resumeContent = "Downloaded PDF file is empty or unreadable.";
+      }
+      else {
         logStep("File downloaded successfully, extracting text");
-        // Extract actual text from PDF
         resumeContent = await extractTextFromPDF(fileData);
-        logStep("Text extraction completed", { contentLength: resumeContent.length });
+        logStep("Text extraction completed", { contentLength: resumeContent.length, first100Chars: resumeContent.substring(0, 100) });
       }
     } catch (downloadErr) {
-      logStep("Download error, using fallback", { error: downloadErr });
-      resumeContent = "Error downloading file. Please try uploading your resume again.";
+      logStep("Download or extraction error, using fallback", { error: downloadErr.message || downloadErr });
+      resumeContent = "Error processing resume file. Please try uploading your resume again.";
     }
 
     logStep("Analyzing resume with Gemini");
 
     // Use Gemini to analyze the resume
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -144,8 +154,8 @@ serve(async (req) => {
             text: `You are an expert resume analyzer. Analyze the provided resume content and extract:
             1. Technical skills (programming languages, software, tools, technologies)
             2. Soft skills (communication, leadership, teamwork, etc.)
-            3. Years of experience (estimate based on work history and dates mentioned)
-            4. Suggested job titles based on the skills and experience found
+            3. Years of experience (estimate based on work history and dates mentioned, return 0 if not determinable)
+            4. Suggested job titles based on the skills and experience found (return empty array if not determinable)
             
             Return the response in this exact JSON format:
             {
@@ -155,10 +165,13 @@ serve(async (req) => {
               "suggested_job_titles": ["title1", "title2", "title3"]
             }
             
-            Be specific and accurate. Extract real skills from the resume content. If the content seems incomplete or corrupted, do your best to extract what you can find.
+            Be specific and accurate. Extract real skills from the resume content. 
+            If the resume content is short, seems like an error message, or uninformative (e.g., "Unable to download PDF file"),
+            return empty arrays for skills and job titles, and 0 for experience_years.
+            Do not invent skills or experience if the input is not a real resume.
             
             Resume content: ${resumeContent}
-            File name: ${resume.file_name}`
+            File name (for context, not analysis): ${resume.file_name}`
           }]
         }],
         generationConfig: {
@@ -188,64 +201,75 @@ serve(async (req) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    if (!geminiResponse.ok) {
+      const errorBody = await geminiResponse.text();
+      logStep("Gemini API error", { status: geminiResponse.status, statusText: geminiResponse.statusText, body: errorBody });
+      throw new Error(`Gemini API error: ${geminiResponse.status} ${geminiResponse.statusText} - ${errorBody}`);
     }
 
-    const geminiData = await response.json();
+    const geminiData = await geminiResponse.json();
+    
+    if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content || !geminiData.candidates[0].content.parts || geminiData.candidates[0].content.parts.length === 0) {
+        logStep("Invalid Gemini response structure", { geminiData });
+        throw new Error("Invalid response structure from Gemini API.");
+    }
     const analysisText = geminiData.candidates[0].content.parts[0].text;
 
     logStep("Gemini analysis completed", { analysisLength: analysisText.length });
 
-    // Parse the AI response
     let extractedSkills;
     try {
-      // Clean up the response text to extract JSON
-      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? jsonMatch[0] : analysisText;
+      const jsonMatch = analysisText.match(/```json\s*([\s\S]*?)\s*```|(\{[\s\S]*\})/);
+      let jsonText = analysisText;
+      if (jsonMatch) {
+        jsonText = jsonMatch[1] || jsonMatch[2]; // Use the content within ```json ... ``` or the direct object
+      }
+      
       extractedSkills = JSON.parse(jsonText);
       
-      // Ensure the structure is correct
-      if (!extractedSkills.technical) extractedSkills.technical = [];
-      if (!extractedSkills.soft) extractedSkills.soft = [];
-      if (!extractedSkills.experience_years) extractedSkills.experience_years = 0;
-      if (!extractedSkills.suggested_job_titles) extractedSkills.suggested_job_titles = [];
+      // Ensure the structure is correct and has defaults
+      extractedSkills.technical = extractedSkills.technical || [];
+      extractedSkills.soft = extractedSkills.soft || [];
+      extractedSkills.experience_years = typeof extractedSkills.experience_years === 'number' ? extractedSkills.experience_years : 0;
+      extractedSkills.suggested_job_titles = Array.isArray(extractedSkills.suggested_job_titles) ? extractedSkills.suggested_job_titles : [];
       
     } catch (parseError) {
-      logStep("Failed to parse AI response, using fallback", { error: parseError, rawResponse: analysisText });
-      // Enhanced fallback - try to extract some basic info
+      logStep("Failed to parse AI response, using fallback", { error: parseError.message, rawResponse: analysisText });
       extractedSkills = {
         technical: [],
         soft: [],
         experience_years: 0,
-        suggested_job_titles: ["Entry Level Position", "Professional", "Specialist"]
+        suggested_job_titles: [] // Default to empty rather than generic titles
       };
     }
 
     logStep("Skills extracted", { 
-      technicalCount: extractedSkills.technical?.length || 0,
-      softCount: extractedSkills.soft?.length || 0,
-      experienceYears: extractedSkills.experience_years || 0
+      technicalCount: extractedSkills.technical.length,
+      softCount: extractedSkills.soft.length,
+      experienceYears: extractedSkills.experience_years,
+      jobTitlesCount: extractedSkills.suggested_job_titles.length
     });
 
-    // Update resume with extracted skills
     const { error: updateError } = await supabaseClient
       .from("resumes")
       .update({
         extracted_skills: extractedSkills,
-        parsed_content: resumeContent.substring(0, 10000), // Store first 10k chars
+        parsed_content: resumeContent.substring(0, 10000),
         updated_at: new Date().toISOString()
       })
       .eq("id", resumeId);
 
-    if (updateError) throw new Error("Failed to update resume with extracted skills");
+    if (updateError) {
+      logStep("Failed to update resume with skills", { error: updateError.message });
+      throw new Error(`Failed to update resume with extracted skills: ${updateError.message}`);
+    }
 
     logStep("Resume updated with skills");
 
     return new Response(JSON.stringify({
       success: true,
       extracted_skills: extractedSkills,
-      suggested_job_titles: extractedSkills.suggested_job_titles || []
+      suggested_job_titles: extractedSkills.suggested_job_titles
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -253,7 +277,7 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    logStep("ERROR", { message: errorMessage, stack: error instanceof Error ? error.stack : undefined });
     
     return new Response(JSON.stringify({ 
       success: false, 
