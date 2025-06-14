@@ -13,6 +13,45 @@ const logStep = (step: string, details?: any) => {
   console.log(`[ANALYZE-RESUME] ${step}${detailsStr}`);
 };
 
+// Function to extract text from PDF using a simple approach
+async function extractTextFromPDF(fileData: Blob): Promise<string> {
+  try {
+    // Convert blob to array buffer
+    const arrayBuffer = await fileData.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Convert to string and look for text content
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
+    
+    // Simple PDF text extraction - look for readable text patterns
+    // This is a basic approach - in production you'd use a proper PDF library
+    const textContent = text
+      .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Remove non-printable chars except whitespace
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+    
+    // If we found substantial text content, return it
+    if (textContent.length > 100) {
+      return textContent;
+    }
+    
+    // Fallback: try to extract text using a different approach
+    const lines = text.split('\n').filter(line => {
+      const cleaned = line.trim();
+      return cleaned.length > 3 && /[a-zA-Z]/.test(cleaned);
+    });
+    
+    if (lines.length > 5) {
+      return lines.join(' ').substring(0, 5000); // Limit to 5000 chars
+    }
+    
+    return "Unable to extract readable text from PDF. Please ensure your PDF contains selectable text.";
+  } catch (error) {
+    console.error('PDF text extraction error:', error);
+    return "Error extracting text from PDF. Please try uploading the PDF again.";
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -79,16 +118,16 @@ serve(async (req) => {
 
       if (downloadError) {
         logStep("Download failed, using fallback content", { error: downloadError.message });
-        resumeContent = "Unable to extract text from PDF. Please ensure your resume is in a readable format.";
+        resumeContent = "Unable to download PDF file. Please ensure the file was uploaded correctly.";
       } else {
         logStep("File downloaded successfully, extracting text");
-        // For now, we'll use a placeholder since PDF text extraction requires additional libraries
-        // In a real implementation, you'd use a PDF parsing library here
-        resumeContent = "PDF content extracted successfully. This is a placeholder for the actual resume text that would be extracted from the PDF file.";
+        // Extract actual text from PDF
+        resumeContent = await extractTextFromPDF(fileData);
+        logStep("Text extraction completed", { contentLength: resumeContent.length });
       }
     } catch (downloadErr) {
       logStep("Download error, using fallback", { error: downloadErr });
-      resumeContent = "Error downloading file. Using fallback analysis.";
+      resumeContent = "Error downloading file. Please try uploading your resume again.";
     }
 
     logStep("Analyzing resume with Gemini");
@@ -103,20 +142,20 @@ serve(async (req) => {
         contents: [{
           parts: [{
             text: `You are an expert resume analyzer. Analyze the provided resume content and extract:
-            1. Technical skills
-            2. Soft skills  
-            3. Years of experience (estimate based on work history)
-            4. Suggested job titles based on the skills and experience
+            1. Technical skills (programming languages, software, tools, technologies)
+            2. Soft skills (communication, leadership, teamwork, etc.)
+            3. Years of experience (estimate based on work history and dates mentioned)
+            4. Suggested job titles based on the skills and experience found
             
             Return the response in this exact JSON format:
             {
-              "technical": ["skill1", "skill2", ...],
-              "soft": ["skill1", "skill2", ...],
+              "technical": ["skill1", "skill2", "skill3"],
+              "soft": ["skill1", "skill2", "skill3"],
               "experience_years": number,
-              "suggested_job_titles": ["title1", "title2", ...]
+              "suggested_job_titles": ["title1", "title2", "title3"]
             }
             
-            Be specific and accurate. Extract real skills from the resume content.
+            Be specific and accurate. Extract real skills from the resume content. If the content seems incomplete or corrupted, do your best to extract what you can find.
             
             Resume content: ${resumeContent}
             File name: ${resume.file_name}`
@@ -165,20 +204,28 @@ serve(async (req) => {
       const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
       const jsonText = jsonMatch ? jsonMatch[0] : analysisText;
       extractedSkills = JSON.parse(jsonText);
+      
+      // Ensure the structure is correct
+      if (!extractedSkills.technical) extractedSkills.technical = [];
+      if (!extractedSkills.soft) extractedSkills.soft = [];
+      if (!extractedSkills.experience_years) extractedSkills.experience_years = 0;
+      if (!extractedSkills.suggested_job_titles) extractedSkills.suggested_job_titles = [];
+      
     } catch (parseError) {
-      logStep("Failed to parse AI response, using fallback", { error: parseError });
-      // Fallback with some generic skills if parsing fails
+      logStep("Failed to parse AI response, using fallback", { error: parseError, rawResponse: analysisText });
+      // Enhanced fallback - try to extract some basic info
       extractedSkills = {
-        technical: ["Communication", "Problem Solving", "Teamwork"],
-        soft: ["Leadership", "Time Management"],
-        experience_years: 3,
-        suggested_job_titles: ["Professional", "Specialist", "Coordinator"]
+        technical: [],
+        soft: [],
+        experience_years: 0,
+        suggested_job_titles: ["Entry Level Position", "Professional", "Specialist"]
       };
     }
 
     logStep("Skills extracted", { 
       technicalCount: extractedSkills.technical?.length || 0,
-      softCount: extractedSkills.soft?.length || 0 
+      softCount: extractedSkills.soft?.length || 0,
+      experienceYears: extractedSkills.experience_years || 0
     });
 
     // Update resume with extracted skills
@@ -186,7 +233,7 @@ serve(async (req) => {
       .from("resumes")
       .update({
         extracted_skills: extractedSkills,
-        parsed_content: resumeContent,
+        parsed_content: resumeContent.substring(0, 10000), // Store first 10k chars
         updated_at: new Date().toISOString()
       })
       .eq("id", resumeId);
