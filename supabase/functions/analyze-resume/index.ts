@@ -15,36 +15,35 @@ const logStep = (step: string, details?: any) => {
 // Function to extract text from PDF using a simple approach
 async function extractTextFromPDF(fileData: Blob): Promise<string> {
   try {
-    // Convert blob to array buffer
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Convert to string and look for text content
     const text = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
-    
-    // Simple PDF text extraction - look for readable text patterns
-    // This is a basic approach - in production you'd use a proper PDF library
+
+    // Check for raw PDF bytes signature at the start
+    if (text.substring(0, 20).includes('%PDF')) {
+      // This is not real extracted text, just the PDF header
+      return "__PDF_BINARY__";
+    }
+
     const textContent = text
-      .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Remove non-printable chars except whitespace
-      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
-    
-    // If we found substantial text content, return it
+
     if (textContent.length > 100) {
       return textContent;
     }
-    
-    // Fallback: try to extract text using a different approach
+
     const lines = text.split('\n').filter(line => {
       const cleaned = line.trim();
       return cleaned.length > 3 && /[a-zA-Z]/.test(cleaned);
     });
-    
+
     if (lines.length > 5) {
-      return lines.join(' ').substring(0, 5000); // Limit to 5000 chars
+      return lines.join(' ').substring(0, 5000);
     }
-    
-    return "Unable to extract readable text from PDF. Please ensure your PDF contains selectable text.";
+
+    return "Unable to extract readable text from PDF. Please ensure your PDF contains selectable, text-based content (not scans or images).";
   } catch (error) {
     console.error('PDF text extraction error:', error);
     return "Error extracting text from PDF. Please try uploading the PDF again.";
@@ -138,6 +137,21 @@ serve(async (req) => {
     } catch (downloadErr) {
       logStep("Download or extraction error, using fallback", { error: downloadErr.message || downloadErr });
       resumeContent = "Error processing resume file. Please try uploading your resume again.";
+    }
+
+    // NEW: bail out if resumeContent indicates binary data and tell the user
+    if (
+      resumeContent === "__PDF_BINARY__" ||
+      resumeContent.startsWith('%PDF')
+    ) {
+      logStep("Resume looks like PDF binary, cannot extract text - informing user.");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Failed to extract resume text. Please upload a PDF that contains selectable, text-based content. Scanned images or protected PDFs will not work."
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400
+      });
     }
 
     logStep("Analyzing resume with Gemini");
