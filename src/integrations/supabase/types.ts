@@ -44,6 +44,62 @@ export type Database = {
           },
         ]
       }
+      interview_questions: {
+        Row: {
+          ai_follow_up_context: Json | null
+          answered_at: string | null
+          created_at: string
+          feedback: string | null
+          id: string
+          interview_id: string
+          question_order: number
+          question_text: string
+          question_type: string
+          response_time_seconds: number | null
+          score: number | null
+          user_answer_audio_url: string | null
+          user_answer_text: string | null
+        }
+        Insert: {
+          ai_follow_up_context?: Json | null
+          answered_at?: string | null
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          interview_id: string
+          question_order: number
+          question_text: string
+          question_type?: string
+          response_time_seconds?: number | null
+          score?: number | null
+          user_answer_audio_url?: string | null
+          user_answer_text?: string | null
+        }
+        Update: {
+          ai_follow_up_context?: Json | null
+          answered_at?: string | null
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          interview_id?: string
+          question_order?: number
+          question_text?: string
+          question_type?: string
+          response_time_seconds?: number | null
+          score?: number | null
+          user_answer_audio_url?: string | null
+          user_answer_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_questions_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "mock_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_matches: {
         Row: {
           company_name: string | null
@@ -137,6 +193,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mock_interviews: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_question_index: number
+          duration_minutes: number | null
+          feedback: Json | null
+          id: string
+          interview_type: string
+          job_title: string
+          overall_score: number | null
+          started_at: string
+          status: string
+          total_questions: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_question_index?: number
+          duration_minutes?: number | null
+          feedback?: Json | null
+          id?: string
+          interview_type?: string
+          job_title: string
+          overall_score?: number | null
+          started_at?: string
+          status?: string
+          total_questions?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_question_index?: number
+          duration_minutes?: number | null
+          feedback?: Json | null
+          id?: string
+          interview_type?: string
+          job_title?: string
+          overall_score?: number | null
+          started_at?: string
+          status?: string
+          total_questions?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

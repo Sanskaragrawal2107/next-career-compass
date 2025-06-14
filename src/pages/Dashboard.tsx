@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import ResumeAnalysis from '@/components/ResumeAnalysis';
 import JobMatches from '@/components/JobMatches';
 import SkillGapRoadmap from '@/components/SkillGapRoadmap';
+import MockInterview from '@/components/MockInterview';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const Dashboard = () => {
     jobMatches: 0,
     skillsIdentified: 0,
     roadmapsGenerated: 0,
+    interviewsCompleted: 0,
   });
   const [activeTab, setActiveTab] = useState("upload");
   const [roadmapSkills, setRoadmapSkills] = useState<any>(null);
@@ -71,14 +73,21 @@ const Dashboard = () => {
         jobMatchCount = count || 0;
       }
 
+      const { count: interviewCount } = await supabase
+        .from('mock_interviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'completed');
+
       setStats({
         resumesAnalyzed: resumeCount || 0,
         jobMatches: jobMatchCount,
         skillsIdentified: 0,
         roadmapsGenerated: jobSearchCount || 0,
+        interviewsCompleted: interviewCount || 0,
       });
       
-      console.log('Stats updated:', { resumeCount, jobMatchCount, jobSearchCount });
+      console.log('Stats updated:', { resumeCount, jobMatchCount, jobSearchCount, interviewCount });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -253,7 +262,7 @@ const Dashboard = () => {
         </div>
 
         {/* Progress Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardContent className="p-4">
               <div className="flex justify-between items-center">
@@ -286,11 +295,19 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Interviews Done</span>
+                <span className="text-2xl font-bold text-red-600">{stats.interviewsCompleted}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="upload" className="flex items-center">
               <Upload className="w-4 h-4 mr-2" />
               Upload Resume
@@ -306,6 +323,10 @@ const Dashboard = () => {
             <TabsTrigger value="roadmap" disabled={!uploadedResume}>
               <Target className="w-4 h-4 mr-2" />
               Skill Roadmap
+            </TabsTrigger>
+            <TabsTrigger value="interview">
+              <Target className="w-4 h-4 mr-2" />
+              Mock Interview
             </TabsTrigger>
           </TabsList>
 
@@ -372,6 +393,10 @@ const Dashboard = () => {
               selectedJobTitles={selectedJobTitles}
               userSkills={roadmapSkills}
             />
+          </TabsContent>
+
+          <TabsContent value="interview" className="space-y-6">
+            <MockInterview />
           </TabsContent>
         </Tabs>
       </div>
