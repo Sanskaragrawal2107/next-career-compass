@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -20,12 +19,15 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const adzunaAppId = Deno.env.get('ADZUNA_API_KEY');
-    const adzunaAppKey = Deno.env.get('ADZUNA_API_KEY');
+    // Use the correct Adzuna application ID and API key
+    const adzunaAppId = "bf099ae7"; // Your provided application ID
+    const adzunaAppKey = Deno.env.get('ADZUNA_API_KEY'); // Your API key from secrets
     
-    if (!adzunaAppId) {
+    if (!adzunaAppKey) {
       throw new Error("Adzuna API key not configured");
     }
+
+    logStep("Adzuna credentials configured", { appId: adzunaAppId });
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -106,7 +108,7 @@ serve(async (req) => {
         const skillsQuery = technicalSkills.slice(0, 3).join(' ');
         const searchQuery = `${jobTitle} ${skillsQuery}`;
 
-        // Build Adzuna API URL with proper authentication
+        // Build Adzuna API URL with correct credentials
         let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=20&sort_by=relevance`;
         
         // Add location filter if provided
@@ -114,7 +116,11 @@ serve(async (req) => {
           adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
         }
         
-        logStep("Calling Adzuna API", { url: adzunaUrl.replace(adzunaAppId, '[HIDDEN]').replace(adzunaAppKey, '[HIDDEN]') });
+        logStep("Calling Adzuna API", { 
+          url: adzunaUrl.replace(adzunaAppKey, '[HIDDEN]'),
+          query: searchQuery,
+          location: preferredLocation || 'All locations'
+        });
 
         const adzunaResponse = await fetch(adzunaUrl);
         
