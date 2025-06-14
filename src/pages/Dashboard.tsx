@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, FileText, Target, TrendingUp, Download, LogOut, User } from 'lucide-react';
+import { Upload, FileText, Target, TrendingUp, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -155,7 +155,7 @@ const Dashboard = () => {
           user_id: user!.id,
           file_name: file.name,
           file_url: data.publicUrl,
-          extracted_skills: {},
+          extracted_skills: {}, // Initialize with an empty object
           parsed_content: '',
         })
         .select()
@@ -166,14 +166,14 @@ const Dashboard = () => {
       }
 
       setUploadedResume(resumeData);
-      setActiveTab("analysis");
+      setActiveTab("analysis"); // Go to analysis tab after upload
       
       toast({
         title: "Resume uploaded successfully!",
         description: "Ready for AI analysis.",
       });
 
-      fetchUserStats();
+      fetchUserStats(); // Update stats after new resume upload
     } catch (error: any) {
       console.error('Upload error:', error);
       toast({
@@ -193,7 +193,8 @@ const Dashboard = () => {
 
   const handleAnalysisComplete = () => {
     setActiveTab("matches");
-    fetchUserStats();
+    fetchUserStats(); // Refresh stats potentially
+    fetchLatestResume(); // Refresh resume data as analysis might update extracted_skills
   };
 
   if (authLoading) {
@@ -324,7 +325,7 @@ const Dashboard = () => {
                       <FileText className="w-5 h-5 text-green-600 mr-2" />
                       <span className="text-green-800 font-medium">Resume uploaded successfully!</span>
                     </div>
-                    <p className="text-green-600 text-sm mt-1">Ready for AI analysis</p>
+                    <p className="text-green-600 text-sm mt-1">Ready for AI analysis. Go to the 'AI Analysis' tab.</p>
                   </div>
                 )}
               </CardContent>
