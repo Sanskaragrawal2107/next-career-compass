@@ -19,9 +19,10 @@ interface ResumeAnalysisProps {
   resumeId: string;
   initialExtractedSkills?: ExtractedSkillsData | null | {}; // Allow {}, null, or actual data
   onAnalysisComplete: () => void;
+  onRoadmapDataUpdate?: (skills: any, jobTitles: string[]) => void;
 }
 
-const ResumeAnalysis = ({ resumeId, initialExtractedSkills, onAnalysisComplete }: ResumeAnalysisProps) => {
+const ResumeAnalysis = ({ resumeId, initialExtractedSkills, onAnalysisComplete, onRoadmapDataUpdate }: ResumeAnalysisProps) => {
   // Helper to check if initialExtractedSkills are valid and not empty
   const isValidInitialSkills = (skills: any): skills is ExtractedSkillsData => {
     return skills && 
@@ -123,6 +124,12 @@ const ResumeAnalysis = ({ resumeId, initialExtractedSkills, onAnalysisComplete }
           title: "Job matches generated!",
           description: `Found ${data.matches_found} job opportunities matching your profile.`,
         });
+        
+        // Pass roadmap data to parent component
+        if (onRoadmapDataUpdate && extractedSkills) {
+          onRoadmapDataUpdate(extractedSkills, selectedJobTitles);
+        }
+        
         onAnalysisComplete();
       } else {
         throw new Error(data.error || 'Match generation failed');

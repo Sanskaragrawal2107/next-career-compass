@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import ResumeAnalysis from '@/components/ResumeAnalysis';
 import JobMatches from '@/components/JobMatches';
+import SkillGapRoadmap from '@/components/SkillGapRoadmap';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -22,6 +23,8 @@ const Dashboard = () => {
     roadmapsGenerated: 0,
   });
   const [activeTab, setActiveTab] = useState("upload");
+  const [roadmapSkills, setRoadmapSkills] = useState<any>(null);
+  const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
 
   useEffect(() => {
     console.log('Dashboard mounted, auth state:', { user: user?.email, subscription, authLoading });
@@ -205,6 +208,11 @@ const Dashboard = () => {
     fetchLatestResume(); // Refresh resume data as analysis might update extracted_skills
   };
 
+  const handleRoadmapDataUpdate = (skills: any, jobTitles: string[]) => {
+    setRoadmapSkills(skills);
+    setSelectedJobTitles(jobTitles);
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -282,7 +290,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="upload" className="flex items-center">
               <Upload className="w-4 h-4 mr-2" />
               Upload Resume
@@ -294,6 +302,10 @@ const Dashboard = () => {
             <TabsTrigger value="matches" disabled={!uploadedResume}>
               <TrendingUp className="w-4 h-4 mr-2" />
               Job Matches
+            </TabsTrigger>
+            <TabsTrigger value="roadmap" disabled={!uploadedResume}>
+              <Target className="w-4 h-4 mr-2" />
+              Skill Roadmap
             </TabsTrigger>
           </TabsList>
 
@@ -346,12 +358,36 @@ const Dashboard = () => {
                 resumeId={uploadedResume.id}
                 initialExtractedSkills={uploadedResume.extracted_skills}
                 onAnalysisComplete={handleAnalysisComplete}
+                onRoadmapDataUpdate={handleRoadmapDataUpdate}
               />
             )}
           </TabsContent>
 
           <TabsContent value="matches" className="space-y-6">
             <JobMatches />
+          </TabsContent>
+
+          <TabsContent value="roadmap" className="space-y-6">
+            {roadmapSkills && selectedJobTitles.length > 0 ? (
+              <SkillGapRoadmap 
+                selectedJobTitles={selectedJobTitles}
+                userSkills={roadmapSkills}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Skill Gap Roadmap</CardTitle>
+                  <CardDescription>
+                    Complete the AI Analysis and select job titles to generate your personalized learning roadmap
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={() => setActiveTab("analysis")} variant="outline">
+                    Go to AI Analysis
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
