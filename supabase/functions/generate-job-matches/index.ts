@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -20,9 +19,8 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Use the correct Adzuna application ID and API key
-    const adzunaAppId = "bf099ae7"; // Your provided application ID
-    const adzunaAppKey = Deno.env.get('ADZUNA_API_KEY'); // Your API key from secrets
+    const adzunaAppId = "bf099ae7"; 
+    const adzunaAppKey = Deno.env.get('ADZUNA_API_KEY'); 
     
     if (!adzunaAppKey) {
       throw new Error("Adzuna API key not configured");
@@ -55,7 +53,6 @@ serve(async (req) => {
 
     logStep("Input validated", { resumeId, jobTitleCount: selectedJobTitles.length, preferredLocation });
 
-    // Get the resume data with extracted skills
     const { data: resume, error: resumeError } = await supabaseClient
       .from("resumes")
       .select("extracted_skills, file_name")
@@ -77,14 +74,15 @@ serve(async (req) => {
       experienceYears: resume.extracted_skills.experience_years || 0
     });
 
-    // Create job search record
     const { data: jobSearch, error: jobSearchError } = await supabaseClient
       .from("job_searches")
       .insert({
         user_id: user.id,
         resume_id: resumeId,
         selected_job_titles: selectedJobTitles,
-        search_status: "processing"
+        search_status: "processing",
+        // Storing preferred_location in job_searches might be useful for future reference/filtering
+        // preferred_location: preferredLocation 
       })
       .select()
       .single();
@@ -92,8 +90,7 @@ serve(async (req) => {
     if (jobSearchError) throw new Error("Failed to create job search record");
     
     logStep("Job search created", { jobSearchId: jobSearch.id });
-
-    // Extract skills and experience data
+    
     const skillsData = resume.extracted_skills;
     const technicalSkills = skillsData.technical || [];
     const softSkills = skillsData.soft || [];
@@ -101,33 +98,41 @@ serve(async (req) => {
 
     const jobMatches = [];
 
+    // Determine Adzuna country code based on preferredLocation
+    let adzunaCountry = 'us'; // Default to US
+    const locationLowerCase = preferredLocation?.toLowerCase() || '';
+    const indianCities = ["indore", "mumbai", "delhi", "bangalore", "pune", "hyderabad", "chennai", "kolkata", "india"];
+    if (indianCities.some(city => locationLowerCase.includes(city))) {
+      adzunaCountry = 'in'; // Switch to India
+    }
+    logStep("Determined Adzuna country", { country: adzunaCountry, preferredLocation });
+
+
     for (const jobTitle of selectedJobTitles) {
-      logStep("Searching for real jobs", { jobTitle });
+      logStep("Searching for real jobs", { jobTitle, country: adzunaCountry });
 
       try {
-        // Try multiple search strategies to find jobs
         const searchStrategies = [
-          jobTitle, // Just the job title
-          jobTitle.replace(/\s+/g, '+'), // URL encoded spaces
-          jobTitle.split(' ')[0], // First word only
-          `${jobTitle} entry level`, // Add entry level for junior positions
+          jobTitle,
+          jobTitle.replace(/\s+/g, '+'),
+          jobTitle.split(' ')[0],
+          `${jobTitle} entry level`,
         ];
 
         let jobs = [];
         
         for (const searchQuery of searchStrategies) {
-          // Build Adzuna API URL with correct credentials
-          let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=50&sort_by=relevance`;
+          let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/${adzunaCountry}/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=50&sort_by=relevance`;
           
-          // Add location filter if provided
           if (preferredLocation && preferredLocation.trim() !== '') {
             adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
           }
           
           logStep("Calling Adzuna API", { 
             strategy: searchQuery,
-            url: adzunaUrl.replace(adzunaAppKey, '[HIDDEN]'),
-            location: preferredLocation || 'All locations'
+            url: adzunaUrl.replace(adzunaAppKey, '[HIDDEN]'), // Hide API key in logs
+            location: preferredLocation || `All locations in ${adzunaCountry.toUpperCase()}`,
+            country: adzunaCountry
           });
 
           const adzunaResponse = await fetch(adzunaUrl);
@@ -138,9 +143,10 @@ serve(async (req) => {
               status: adzunaResponse.status, 
               statusText: adzunaResponse.statusText,
               error: errorText,
-              strategy: searchQuery
+              strategy: searchQuery,
+              country: adzunaCountry
             });
-            continue; // Try next strategy
+            continue; 
           }
 
           const adzunaData = await adzunaResponse.json();
@@ -149,39 +155,46 @@ serve(async (req) => {
           logStep("Adzuna jobs received", { 
             count: searchJobs.length,
             strategy: searchQuery,
-            totalCount: adzunaData.count || 0
+            totalCount: adzunaData.count || 0,
+            country: adzunaCountry
           });
 
           if (searchJobs.length > 0) {
             jobs = searchJobs;
-            break; // Found jobs, stop trying other strategies
+            break; 
           }
         }
 
-        // If still no jobs found, try a very broad search
         if (jobs.length === 0) {
           const broadTerms = ['marketing', 'assistant', 'coordinator', 'specialist', 'manager'];
           const relevantTerm = broadTerms.find(term => 
             jobTitle.toLowerCase().includes(term)
           ) || 'entry level';
 
-          let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(relevantTerm)}&results_per_page=50&sort_by=relevance`;
+          let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/${adzunaCountry}/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(relevantTerm)}&results_per_page=50&sort_by=relevance`;
           
           if (preferredLocation && preferredLocation.trim() !== '') {
             adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
           }
 
-          logStep("Trying broad search", { term: relevantTerm });
+          logStep("Trying broad search", { term: relevantTerm, country: adzunaCountry });
 
           const adzunaResponse = await fetch(adzunaUrl);
           if (adzunaResponse.ok) {
             const adzunaData = await adzunaResponse.json();
             jobs = adzunaData.results || [];
-            logStep("Broad search results", { count: jobs.length });
+            logStep("Broad search results", { count: jobs.length, country: adzunaCountry });
+          } else {
+            const errorText = await adzunaResponse.text();
+            logStep("Adzuna API error (broad search)", { 
+              status: adzunaResponse.status, 
+              statusText: adzunaResponse.statusText,
+              error: errorText,
+              country: adzunaCountry
+            });
           }
         }
 
-        // Process found jobs
         for (const job of jobs.slice(0, 5)) { // Limit to 5 jobs per title
           try {
             // Calculate match percentage based on skills overlap
@@ -204,22 +217,20 @@ serve(async (req) => {
               }
             }
             
-            // Calculate percentage (minimum 60% for inclusion)
             const maxPossibleScore = (technicalSkills.length * 2) + (softSkills.length * 1);
-            let matchPercentage = maxPossibleScore > 0 ? Math.floor((matchScore / maxPossibleScore) * 100) : 70;
+            let matchPercentage = maxPossibleScore > 0 ? Math.floor((matchScore / maxPossibleScore) * 100) : 70; // Default to 70% if no skills
             
-            // Ensure minimum match percentage for display
-            matchPercentage = Math.min(95, Math.max(60, matchPercentage));
+            matchPercentage = Math.min(95, Math.max(60, matchPercentage)); // Ensure 60-95% range
             
-            // Extract salary information
             let salaryRange = 'Salary not specified';
             if (job.salary_min && job.salary_max) {
               salaryRange = `$${Math.floor(job.salary_min).toLocaleString()} - $${Math.floor(job.salary_max).toLocaleString()}`;
             } else if (job.salary_min) {
               salaryRange = `From $${Math.floor(job.salary_min).toLocaleString()}`;
+            } else if (job.salary_is_predicted === "1" && job.salary) { // Adzuna sometimes provides a single salary field
+                salaryRange = `Around $${Math.floor(job.salary).toLocaleString()} (Predicted)`;
             }
 
-            // Create requirements object from job description
             const requirements = {
               required_skills: technicalSkills.filter(skill => 
                 jobDescription.includes(skill.toLowerCase())
@@ -251,23 +262,20 @@ serve(async (req) => {
 
           } catch (jobError) {
             logStep("Error processing individual job", { error: jobError.message });
-            // Continue processing other jobs
           }
         }
 
-      } catch (adzunaError) {
-        logStep("Adzuna API error for job title", { 
+      } catch (apiError) {
+        logStep("API or processing error for job title", { 
           jobTitle, 
-          error: adzunaError.message 
+          error: apiError.message 
         });
-        // Continue with next job title
       }
     }
 
     logStep("Total job matches found", { count: jobMatches.length });
 
     if (jobMatches.length === 0) {
-      // Update job search status to completed but with no matches
       await supabaseClient
         .from("job_searches")
         .update({ 
@@ -280,21 +288,19 @@ serve(async (req) => {
         success: true,
         job_search_id: jobSearch.id,
         matches_found: 0,
-        message: "No matching jobs found. Try broadening your search criteria or different job titles."
+        message: "No matching jobs found. Try broadening your search criteria, checking the location, or using different job titles."
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    // Insert job matches into database
     const { error: insertError } = await supabaseClient
       .from("job_matches")
       .insert(jobMatches);
 
-    if (insertError) throw new Error("Failed to insert job matches");
+    if (insertError) throw new Error(`Failed to insert job matches: ${insertError.message}`);
 
-    // Update job search status
     const { error: updateError } = await supabaseClient
       .from("job_searches")
       .update({ 
@@ -303,7 +309,7 @@ serve(async (req) => {
       })
       .eq("id", jobSearch.id);
 
-    if (updateError) throw new Error("Failed to update job search status");
+    if (updateError) throw new Error(`Failed to update job search status: ${updateError.message}`);
 
     logStep("Job search completed successfully");
 
@@ -321,12 +327,29 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
     
+    // Attempt to update job search status to 'failed' if possible
+    // This is a best-effort attempt and might not always succeed if jobSearch.id is not available
+    // For example, if the error occurred before jobSearch was created.
+    // A more robust solution would be to pass the jobSearchId to a final logging/cleanup step.
+    // For now, this is a simple attempt.
+    // if (jobSearch && jobSearch.id) { // Check if jobSearch and id exist
+    //   try {
+    //     await supabaseClient
+    //       .from("job_searches")
+    //       .update({ search_status: "failed", updated_at: new Date().toISOString() })
+    //       .eq("id", jobSearch.id);
+    //     logStep("Job search status updated to failed due to error");
+    //   } catch (updateErr) {
+    //     logStep("Error updating job search status to failed", { error: updateErr.message });
+    //   }
+    // }
+
     return new Response(JSON.stringify({ 
       success: false, 
       error: errorMessage 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 500, // Ensure status 500 for errors
     });
   }
 });
