@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Brain, Target, Loader2, CheckCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Brain, Target, Loader2, CheckCircle, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,6 +19,7 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
   const [analyzed, setAnalyzed] = useState(false);
   const [extractedSkills, setExtractedSkills] = useState<any>(null);
   const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
+  const [preferredLocation, setPreferredLocation] = useState('');
   const [generatingMatches, setGeneratingMatches] = useState(false);
 
   const handleAnalyzeResume = async () => {
@@ -78,7 +80,8 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
       const { data, error } = await supabase.functions.invoke('generate-job-matches', {
         body: { 
           resumeId,
-          selectedJobTitles 
+          selectedJobTitles,
+          preferredLocation: preferredLocation.trim()
         }
       });
 
@@ -187,45 +190,68 @@ const ResumeAnalysis = ({ resumeId, onAnalysisComplete }: ResumeAnalysisProps) =
         <CardHeader>
           <CardTitle className="flex items-center">
             <Target className="w-5 h-5 mr-2" />
-            Select Target Job Titles
+            Select Target Job Titles & Location
           </CardTitle>
           <CardDescription>
-            Choose the job titles you're interested in to get personalized job matches
+            Choose the job titles you're interested in and specify your preferred location
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {extractedSkills.suggested_job_titles.map((jobTitle: string, index: number) => (
-              <div key={index} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`job-${index}`}
-                  checked={selectedJobTitles.includes(jobTitle)}
-                  onCheckedChange={() => handleJobTitleToggle(jobTitle)}
-                />
-                <label htmlFor={`job-${index}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  {jobTitle}
-                </label>
-              </div>
-            ))}
-          </div>
+          <div className="space-y-4">
+            {/* Location Input */}
+            <div className="space-y-2">
+              <label htmlFor="location" className="text-sm font-medium flex items-center">
+                <MapPin className="w-4 h-4 mr-1" />
+                Preferred Location (optional)
+              </label>
+              <Input
+                id="location"
+                type="text"
+                placeholder="e.g., New York, NY or Remote"
+                value={preferredLocation}
+                onChange={(e) => setPreferredLocation(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">
+                Leave empty to search all locations
+              </p>
+            </div>
 
-          <Button 
-            onClick={handleGenerateMatches}
-            disabled={generatingMatches || selectedJobTitles.length === 0}
-            className="w-full mt-4"
-          >
-            {generatingMatches ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating Job Matches...
-              </>
-            ) : (
-              <>
-                <Target className="w-4 h-4 mr-2" />
-                Generate Job Matches ({selectedJobTitles.length} selected)
-              </>
-            )}
-          </Button>
+            {/* Job Titles */}
+            <div className="space-y-3">
+              <h4 className="font-medium">Job Titles</h4>
+              {extractedSkills.suggested_job_titles.map((jobTitle: string, index: number) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`job-${index}`}
+                    checked={selectedJobTitles.includes(jobTitle)}
+                    onCheckedChange={() => handleJobTitleToggle(jobTitle)}
+                  />
+                  <label htmlFor={`job-${index}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    {jobTitle}
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            <Button 
+              onClick={handleGenerateMatches}
+              disabled={generatingMatches || selectedJobTitles.length === 0}
+              className="w-full mt-4"
+            >
+              {generatingMatches ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Searching Real Jobs...
+                </>
+              ) : (
+                <>
+                  <Target className="w-4 h-4 mr-2" />
+                  Search Real Jobs ({selectedJobTitles.length} selected)
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

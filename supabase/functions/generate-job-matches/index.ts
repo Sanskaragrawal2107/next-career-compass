@@ -20,8 +20,10 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const adzunaApiKey = Deno.env.get('ADZUNA_API_KEY');
-    if (!adzunaApiKey) {
+    const adzunaAppId = Deno.env.get('ADZUNA_API_KEY');
+    const adzunaAppKey = Deno.env.get('ADZUNA_API_KEY');
+    
+    if (!adzunaAppId) {
       throw new Error("Adzuna API key not configured");
     }
 
@@ -43,12 +45,12 @@ serve(async (req) => {
     
     logStep("User authenticated", { userId: user.id });
 
-    const { resumeId, selectedJobTitles } = await req.json();
+    const { resumeId, selectedJobTitles, preferredLocation } = await req.json();
     if (!resumeId || !selectedJobTitles || !Array.isArray(selectedJobTitles)) {
       throw new Error("Resume ID and selected job titles are required");
     }
 
-    logStep("Input validated", { resumeId, jobTitleCount: selectedJobTitles.length });
+    logStep("Input validated", { resumeId, jobTitleCount: selectedJobTitles.length, preferredLocation });
 
     // Get the resume data with extracted skills
     const { data: resume, error: resumeError } = await supabaseClient
@@ -101,18 +103,25 @@ serve(async (req) => {
 
       try {
         // Create search query with skills for better matching
-        const skillsQuery = technicalSkills.slice(0, 3).join(' OR ');
+        const skillsQuery = technicalSkills.slice(0, 3).join(' ');
         const searchQuery = `${jobTitle} ${skillsQuery}`;
 
-        // Search for jobs using Adzuna API
-        const adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaApiKey}&app_key=${adzunaApiKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=20&sort_by=relevance`;
+        // Build Adzuna API URL with proper authentication
+        let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${encodeURIComponent(searchQuery)}&results_per_page=20&sort_by=relevance`;
         
-        logStep("Calling Adzuna API", { url: adzunaUrl.replace(adzunaApiKey, '[HIDDEN]') });
+        // Add location filter if provided
+        if (preferredLocation && preferredLocation.trim() !== '') {
+          adzunaUrl += `&where=${encodeURIComponent(preferredLocation)}`;
+        }
+        
+        logStep("Calling Adzuna API", { url: adzunaUrl.replace(adzunaAppId, '[HIDDEN]').replace(adzunaAppKey, '[HIDDEN]') });
 
         const adzunaResponse = await fetch(adzunaUrl);
         
         if (!adzunaResponse.ok) {
-          throw new Error(`Adzuna API error: ${adzunaResponse.status}`);
+          const errorText = await adzunaResponse.text();
+          logStep("Adzuna API error details", { status: adzunaResponse.status, error: errorText });
+          throw new Error(`Adzuna API error: ${adzunaResponse.status} - ${errorText}`);
         }
 
         const adzunaData = await adzunaResponse.json();
@@ -144,12 +153,13 @@ serve(async (req) => {
               }
             }
             
-            // Calculate percentage (minimum 75% for inclusion)
+            // Calculate percentage (minimum 60% for inclusion to get more matches)
             const maxPossibleScore = (technicalSkills.length * 2) + (softSkills.length * 1);
-            const matchPercentage = Math.min(95, Math.max(75, Math.floor((matchScore / maxPossibleScore) * 100)));
+            let matchPercentage = maxPossibleScore > 0 ? Math.floor((matchScore / maxPossibleScore) * 100) : 75;
+            matchPercentage = Math.min(95, Math.max(60, matchPercentage));
             
-            // Only include jobs with at least 75% match
-            if (matchPercentage >= 75) {
+            // Only include jobs with at least 60% match
+            if (matchPercentage >= 60) {
               // Extract salary information
               let salaryRange = 'Salary not specified';
               if (job.salary_min && job.salary_max) {
