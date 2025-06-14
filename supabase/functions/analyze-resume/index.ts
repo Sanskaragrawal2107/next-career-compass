@@ -21,9 +21,9 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error("OpenAI API key not configured. Please add OPENAI_API_KEY to your edge function secrets.");
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error("Gemini API key not configured. Please add GEMINI_API_KEY to your edge function secrets.");
     }
 
     const supabaseClient = createClient(
@@ -91,21 +91,18 @@ serve(async (req) => {
       resumeContent = "Error downloading file. Using fallback analysis.";
     }
 
-    logStep("Analyzing resume with OpenAI");
+    logStep("Analyzing resume with Gemini");
 
-    // Use OpenAI to analyze the resume
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Use Gemini to analyze the resume
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert resume analyzer. Analyze the provided resume content and extract:
+        contents: [{
+          parts: [{
+            text: `You are an expert resume analyzer. Analyze the provided resume content and extract:
             1. Technical skills
             2. Soft skills  
             3. Years of experience (estimate based on work history)
@@ -119,30 +116,55 @@ serve(async (req) => {
               "suggested_job_titles": ["title1", "title2", ...]
             }
             
-            Be specific and accurate. Extract real skills from the resume content.`
+            Be specific and accurate. Extract real skills from the resume content.
+            
+            Resume content: ${resumeContent}
+            File name: ${resume.file_name}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 1,
+          topP: 1,
+          maxOutputTokens: 2048,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
           },
           {
-            role: 'user',
-            content: `Please analyze this resume content and extract skills and information: ${resumeContent}\n\nFile name: ${resume.file_name}`
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
           }
-        ],
-        temperature: 0.3,
+        ]
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
     }
 
-    const openAIData = await response.json();
-    const analysisText = openAIData.choices[0].message.content;
+    const geminiData = await response.json();
+    const analysisText = geminiData.candidates[0].content.parts[0].text;
 
-    logStep("OpenAI analysis completed", { analysisLength: analysisText.length });
+    logStep("Gemini analysis completed", { analysisLength: analysisText.length });
 
     // Parse the AI response
     let extractedSkills;
     try {
-      extractedSkills = JSON.parse(analysisText);
+      // Clean up the response text to extract JSON
+      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : analysisText;
+      extractedSkills = JSON.parse(jsonText);
     } catch (parseError) {
       logStep("Failed to parse AI response, using fallback", { error: parseError });
       // Fallback with some generic skills if parsing fails
