@@ -198,6 +198,75 @@ export type Database = {
         }
         Relationships: []
       }
+      roadmap_progress: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          day: number
+          id: string
+          job_title: string
+          task_index: number
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          day: number
+          id?: string
+          job_title: string
+          task_index: number
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          day?: number
+          id?: string
+          job_title?: string
+          task_index?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skill_roadmaps: {
+        Row: {
+          created_at: string
+          estimated_weeks: number
+          id: string
+          job_title: string
+          roadmap_data: Json
+          skill_gaps: Json
+          total_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_weeks?: number
+          id?: string
+          job_title: string
+          roadmap_data?: Json
+          skill_gaps?: Json
+          total_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_weeks?: number
+          id?: string
+          job_title?: string
+          roadmap_data?: Json
+          skill_gaps?: Json
+          total_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscribers: {
         Row: {
           created_at: string

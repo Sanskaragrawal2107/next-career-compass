@@ -34,6 +34,16 @@ interface RoadmapData {
   estimatedWeeks: number;
 }
 
+interface RoadmapProgress {
+  user_id: string;
+  job_title: string;
+  day: number;
+  task_index: number;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+}
+
 interface SkillGapRoadmapProps {
   selectedJobTitles: string[];
   userSkills: {
@@ -65,14 +75,14 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
 
     try {
       const { data, error } = await supabase
-        .from('roadmap_progress')
+        .from('roadmap_progress' as any)
         .select('*')
         .eq('user_id', user.id);
 
       if (error) throw error;
 
       const completed: { [key: string]: boolean } = {};
-      data?.forEach(item => {
+      (data as RoadmapProgress[])?.forEach(item => {
         completed[`${item.job_title}_${item.day}_${item.task_index}`] = item.completed;
       });
       setCompletedTasks(completed);
@@ -128,7 +138,7 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
       if (newStatus) {
         // Mark as completed
         const { error } = await supabase
-          .from('roadmap_progress')
+          .from('roadmap_progress' as any)
           .upsert({
             user_id: user?.id,
             job_title: jobTitle,
@@ -142,7 +152,7 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
       } else {
         // Mark as incomplete
         const { error } = await supabase
-          .from('roadmap_progress')
+          .from('roadmap_progress' as any)
           .delete()
           .eq('user_id', user?.id)
           .eq('job_title', jobTitle)
