@@ -84,8 +84,8 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
       if (existingRoadmaps && existingRoadmaps.length > 0) {
         const formattedRoadmaps: RoadmapData[] = existingRoadmaps.map(roadmap => ({
           jobTitle: roadmap.job_title,
-          skillGaps: Array.isArray(roadmap.skill_gaps) ? roadmap.skill_gaps as SkillGap[] : [],
-          roadmap: Array.isArray(roadmap.roadmap_data) ? roadmap.roadmap_data as RoadmapDay[] : [],
+          skillGaps: Array.isArray(roadmap.skill_gaps) ? roadmap.skill_gaps as unknown as SkillGap[] : [],
+          roadmap: Array.isArray(roadmap.roadmap_data) ? roadmap.roadmap_data as unknown as RoadmapDay[] : [],
           totalDays: roadmap.total_days || 30,
           estimatedWeeks: roadmap.estimated_weeks || 4
         }));
