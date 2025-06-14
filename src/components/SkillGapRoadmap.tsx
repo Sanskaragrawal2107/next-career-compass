@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +46,7 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
   const { user } = useAuth();
   const [roadmaps, setRoadmaps] = useState<RoadmapData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [activeRoadmap, setActiveRoadmap] = useState<string>('');
   const [completedTasks, setCompletedTasks] = useState<{ [key: string]: boolean }>({});
 
@@ -83,9 +83,19 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
 
   const generateRoadmaps = async () => {
     setLoading(true);
+    setLoadingProgress(0);
+    
     try {
       console.log('Generating roadmaps for job titles:', selectedJobTitles);
       
+      // Show progress updates
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 10;
+        });
+      }, 500);
+
       const { data, error } = await supabase.functions.invoke('generate-skill-roadmap', {
         body: { 
           selectedJobTitles,
@@ -93,6 +103,9 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
           userId: user?.id
         }
       });
+
+      clearInterval(progressInterval);
+      setLoadingProgress(100);
 
       if (error) throw error;
 
@@ -117,6 +130,7 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
       });
     } finally {
       setLoading(false);
+      setLoadingProgress(0);
     }
   };
 
@@ -186,7 +200,18 @@ const SkillGapRoadmap = ({ selectedJobTitles, userSkills }: SkillGapRoadmapProps
       <Card>
         <CardContent className="p-8 text-center">
           <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin" />
-          <p className="text-muted-foreground">Analyzing skill gaps and generating personalized roadmaps...</p>
+          <p className="text-muted-foreground mb-4">
+            Analyzing skill gaps and generating personalized roadmaps...
+          </p>
+          <div className="max-w-md mx-auto">
+            <Progress value={loadingProgress} className="h-2 mb-2" />
+            <p className="text-sm text-muted-foreground">
+              {loadingProgress < 30 ? 'Analyzing your skills...' :
+               loadingProgress < 60 ? 'Generating learning paths...' :
+               loadingProgress < 90 ? 'Creating daily tasks...' :
+               'Almost ready!'}
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
