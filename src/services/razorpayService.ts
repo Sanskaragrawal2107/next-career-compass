@@ -51,7 +51,7 @@ export const processPayment = async (options: PaymentOptions): Promise<boolean> 
 
     return new Promise((resolve, reject) => {
       const razorpayOptions = {
-        key: 'rzp_test_9999999999', // Replace with your Razorpay key
+        key: 'rzp_live_47mpRvV2Yh9XLZ', // Your live Razorpay key
         amount: order.amount,
         currency: order.currency,
         name: 'CareerBoost AI',
