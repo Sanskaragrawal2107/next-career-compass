@@ -16,9 +16,23 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
   // Check if Web Speech API is supported
   const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+
+  const cleanup = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore errors when stopping
+      }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
 
   const startListening = useCallback(async () => {
     if (!isSupported) {
@@ -28,7 +42,9 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
 
     try {
       setError(null);
-      setTranscript('');
+      
+      // Clean up any existing recognition
+      cleanup();
 
       // Create speech recognition instance
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -37,10 +53,12 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
         console.log('Speech recognition started');
         setIsListening(true);
+        retryCountRef.current = 0;
       };
 
       recognition.onresult = (event: any) => {
@@ -61,30 +79,72 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
 
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
-        setError(`Speech recognition error: ${event.error}`);
-        setIsListening(false);
+        
+        // Handle different types of errors
+        switch (event.error) {
+          case 'network':
+            if (retryCountRef.current < maxRetries) {
+              retryCountRef.current++;
+              setError(`Network error - retrying (${retryCountRef.current}/${maxRetries})...`);
+              // Retry after a short delay
+              setTimeout(() => {
+                if (!isListening) return; // Don't retry if user stopped manually
+                startListening();
+              }, 2000);
+              return;
+            } else {
+              setError('Network connection failed. Please check your internet connection and try again.');
+            }
+            break;
+          case 'not-allowed':
+            setError('Microphone access denied. Please allow microphone access and try again.');
+            break;
+          case 'no-speech':
+            setError('No speech detected. Please try speaking again.');
+            break;
+          case 'audio-capture':
+            setError('No microphone found. Please connect a microphone and try again.');
+            break;
+          case 'aborted':
+            // Don't show error for user-initiated stops
+            return;
+          default:
+            setError(`Speech recognition error: ${event.error}. Please try again.`);
+        }
+        
+        cleanup();
       };
 
       recognition.onend = () => {
         console.log('Speech recognition ended');
-        setIsListening(false);
+        
+        // Only auto-restart if it wasn't manually stopped and there was no error
+        if (isListening && !error && retryCountRef.current === 0) {
+          console.log('Auto-restarting speech recognition...');
+          setTimeout(() => {
+            if (isListening) {
+              startListening();
+            }
+          }, 100);
+        } else {
+          setIsListening(false);
+        }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
     } catch (error) {
       console.error('Error starting speech recognition:', error);
-      setError('Failed to start speech recognition');
+      setError('Failed to start speech recognition. Please try again.');
+      cleanup();
     }
-  }, [isSupported]);
+  }, [isSupported, cleanup, isListening, error]);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-  }, []);
+    console.log('Manually stopping speech recognition');
+    cleanup();
+    setError(null);
+  }, [cleanup]);
 
   const resetTranscript = useCallback(() => {
     setTranscript('');

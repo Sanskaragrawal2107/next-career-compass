@@ -12,7 +12,8 @@ import {
   ArrowLeft, 
   RotateCcw,
   Play,
-  Pause
+  Pause,
+  AlertCircle
 } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
@@ -336,6 +337,44 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
   const currentQuestionNumber = (previousQA.length || 0) + 1;
   const progress = (currentQuestionNumber / interview.total_questions) * 100;
 
+  const renderSpeechRecognitionStatus = () => {
+    if (speechRecognition.error) {
+      return (
+        <div className="flex items-center justify-center p-3 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+          <span className="text-red-700 text-sm">{speechRecognition.error}</span>
+        </div>
+      );
+    }
+
+    if (speechRecognition.isListening) {
+      return (
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">Listening... Click stop when finished</p>
+          <div className="mt-2 flex justify-center">
+            <div className="bg-red-500 rounded-full w-3 h-3 animate-pulse"></div>
+          </div>
+          {speechRecognition.transcript && (
+            <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
+              <p className="text-muted-foreground">Live transcript:</p>
+              <p>{speechRecognition.transcript}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (!speechRecognition.isSupported) {
+      return (
+        <div className="text-center text-orange-500 text-sm">
+          Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with controls */}
@@ -454,32 +493,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
                     </Button>
                   </div>
 
-                  {speechRecognition.isListening && (
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Listening... Click stop when finished</p>
-                      <div className="mt-2 flex justify-center">
-                        <div className="bg-red-500 rounded-full w-3 h-3 animate-pulse"></div>
-                      </div>
-                      {speechRecognition.transcript && (
-                        <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
-                          <p className="text-muted-foreground">Live transcript:</p>
-                          <p>{speechRecognition.transcript}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {speechRecognition.error && (
-                    <div className="text-center text-red-500 text-sm">
-                      {speechRecognition.error}
-                    </div>
-                  )}
-
-                  {!speechRecognition.isSupported && (
-                    <div className="text-center text-orange-500 text-sm">
-                      Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.
-                    </div>
-                  )}
+                  {renderSpeechRecognitionStatus()}
                 </div>
               ) : (
                 <div className="text-center py-8">
