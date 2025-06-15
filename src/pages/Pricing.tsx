@@ -1,209 +1,216 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, Star, ArrowLeft } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { processPayment } from '@/services/razorpayService';
 import { toast } from '@/hooks/use-toast';
+import AuthModal from '@/components/AuthModal';
 
 const Pricing = () => {
   const navigate = useNavigate();
-  const { user, subscription } = useAuth();
-  const [loading, setLoading] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState<string | null>(null);
 
   const plans = [
     {
       id: 'monthly',
       name: 'Monthly Plan',
-      price: '$9',
-      period: '/month',
-      description: 'Perfect for active job seekers',
+      price: 999,
+      originalPrice: 1499,
+      currency: 'INR',
+      interval: 'month',
       features: [
-        'Unlimited resume uploads',
-        'AI-powered skill extraction',
-        'Job title suggestions',
-        'Skill gap analysis',
-        'Personalized roadmaps',
-        'Job matching (80%+ accuracy)',
+        'AI-powered resume analysis',
+        'Unlimited job matching',
         'ATS-optimized resume generation',
-        'Excel reports',
-        'Email support'
+        'Skill gap analysis & roadmaps',
+        'Mock interview practice',
+        'Excel job reports',
+        '24/7 email support'
       ],
       popular: false,
     },
     {
       id: 'yearly',
       name: 'Yearly Plan',
-      price: '$89',
-      period: '/year',
-      description: 'Best value for career growth',
+      price: 4999,
+      originalPrice: 17988,
+      currency: 'INR',
+      interval: 'year',
       features: [
         'Everything in Monthly Plan',
-        'Priority support',
+        'Priority customer support',
         'Advanced analytics',
-        'Custom branding',
-        'API access',
-        'Bulk processing',
-        'Save $19 annually'
+        'Resume templates',
+        'Career coaching resources',
+        'Job application tracking',
+        'Exclusive webinars & events',
+        '72% savings compared to monthly'
       ],
       popular: true,
     }
   ];
 
-  const handleSubscribe = async (planId: string) => {
+  const handlePayment = async (plan: typeof plans[0]) => {
     if (!user) {
-      toast({
-        title: "Please sign in first",
-        description: "You need to be logged in to subscribe",
-        variant: "destructive",
-      });
-      navigate('/');
+      setAuthModalOpen(true);
       return;
     }
 
-    setLoading(planId);
-    
-    // For now, simulate payment processing
-    // TODO: Integrate with Razorpay
+    if (!profile?.full_name || !profile?.email) {
+      toast({
+        title: "Profile incomplete",
+        description: "Please complete your profile before subscribing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPaymentLoading(plan.id);
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await processPayment({
+        amount: plan.price,
+        currency: plan.currency,
+        planType: plan.id as 'monthly' | 'yearly',
+        userEmail: profile.email,
+        userName: profile.full_name,
+      });
+
       toast({
         title: "Payment successful!",
-        description: "Welcome to your premium account. Redirecting to dashboard...",
+        description: "Your subscription has been activated. Redirecting to dashboard...",
       });
-      
-      // TODO: Update subscription status in database
+
+      // Refresh auth context to get updated subscription
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
+        window.location.reload();
+      }, 2000);
+
     } catch (error) {
+      console.error('Payment failed:', error);
       toast({
         title: "Payment failed",
-        description: "Please try again or contact support",
+        description: "Please try again or contact support if the issue persists.",
         variant: "destructive",
       });
     } finally {
-      setLoading(null);
+      setPaymentLoading(null);
     }
   };
 
-  if (subscription?.subscribed) {
-    navigate('/dashboard');
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')}
-            className="mb-6"
-          >
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* Header */}
+      <header className="container mx-auto px-4 py-6">
+        <nav className="flex justify-between items-center">
+          <Button variant="ghost" onClick={() => navigate('/')} className="flex items-center">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
-          
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">CB</span>
+            </div>
+            <span className="text-xl font-bold text-gray-900">CareerBoost AI</span>
+          </div>
+        </nav>
+      </header>
+
+      {/* Pricing Section */}
+      <section className="container mx-auto px-4 py-20">
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Choose Your Plan
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Unlock AI-powered career enhancement tools and boost your hiring chances
+            Unlock the full power of AI-driven career optimization
           </p>
         </div>
 
-        {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {plans.map((plan) => (
-            <Card 
-              key={plan.id} 
-              className={`relative ${plan.popular ? 'border-primary border-2 shadow-lg scale-105' : 'border-gray-200'}`}
-            >
+            <Card key={plan.id} className={`relative ${plan.popular ? 'border-2 border-blue-500 shadow-2xl scale-105' : 'border shadow-lg'}`}>
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-primary text-white px-4 py-1 rounded-full text-sm font-medium flex items-center">
-                    <Star className="w-4 h-4 mr-1" />
-                    Most Popular
-                  </div>
-                </div>
+                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600">
+                  Most Popular
+                </Badge>
               )}
               
-              <CardHeader className="text-center pb-6">
-                <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                <CardDescription className="text-gray-600">
-                  {plan.description}
-                </CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-600">{plan.period}</span>
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-4xl font-bold">₹{plan.price}</span>
+                    <span className="text-lg text-muted-foreground">/{plan.interval}</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-sm text-muted-foreground line-through">₹{plan.originalPrice}</span>
+                    <Badge variant="secondary">
+                      {Math.round((1 - plan.price / plan.originalPrice) * 100)}% OFF
+                    </Badge>
+                  </div>
                 </div>
+                <CardDescription>
+                  {plan.id === 'yearly' ? 'Best value for serious job seekers' : 'Perfect for getting started'}
+                </CardDescription>
               </CardHeader>
-              
+
               <CardContent>
-                <ul className="space-y-3 mb-6">
+                <ul className="space-y-3">
                   {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
+                    <li key={index} className="flex items-start">
+                      <CheckCircle className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
                       <span className="text-sm text-gray-700">{feature}</span>
                     </li>
                   ))}
                 </ul>
-                
+              </CardContent>
+
+              <CardFooter>
                 <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={() => handleSubscribe(plan.id)}
-                  disabled={loading === plan.id}
-                  variant={plan.popular ? "default" : "outline"}
+                  onClick={() => handlePayment(plan)}
+                  disabled={paymentLoading === plan.id}
+                  className={`w-full text-lg py-6 ${
+                    plan.popular 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700' 
+                      : ''
+                  }`}
                 >
-                  {loading === plan.id ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {paymentLoading === plan.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Processing...
-                    </div>
+                    </>
                   ) : (
-                    `Subscribe to ${plan.name}`
+                    `Get Started - ₹${plan.price}`
                   )}
                 </Button>
-              </CardContent>
+              </CardFooter>
             </Card>
           ))}
         </div>
 
-        {/* Features Overview */}
-        <div className="mt-16 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            What You Get With Every Plan
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">AI-Powered Analysis</h3>
-              <p className="text-gray-600 text-sm">Advanced AI extracts skills and analyzes your resume with 95%+ accuracy</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">High-Match Jobs</h3>
-              <p className="text-gray-600 text-sm">Only jobs with 80%+ compatibility to maximize your success rate</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ArrowLeft className="w-8 h-8 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">ATS Optimization</h3>
-              <p className="text-gray-600 text-sm">Resumes optimized for Applicant Tracking Systems</p>
-            </div>
+        {/* Trust Indicators */}
+        <div className="text-center mt-16">
+          <p className="text-sm text-gray-600 mb-4">
+            Trusted by 10,000+ professionals • Secure payments • Cancel anytime
+          </p>
+          <div className="flex justify-center items-center space-x-6 text-xs text-gray-500">
+            <span>🔒 SSL Secured</span>
+            <span>💳 Razorpay Powered</span>
+            <span>✅ 7-day Money Back</span>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Auth Modal */}
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
     </div>
   );
 };
