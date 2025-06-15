@@ -17,6 +17,9 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ interview, onDone }
 
   useEffect(() => {
     const fetchAndPollResults = () => {
+      let pollCount = 0;
+      const maxPolls = 12; // 12 * 5 seconds = 1 minute
+
       const poller = async () => {
         const { data, error } = await supabase
           .from('mock_interviews')
@@ -37,6 +40,17 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ interview, onDone }
         
         if (data && data.overall_score !== null) {
           setResults(data);
+          setLoading(false);
+          return true; // Stop polling
+        }
+
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          toast({
+            title: "Analysis Taking Longer Than Expected",
+            description: "Your results are still being processed. Please check back in your interview history later.",
+            variant: "default",
+          });
           setLoading(false);
           return true; // Stop polling
         }

@@ -304,7 +304,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
       toast({
         title: "Interview Completed!",
-        description: "Great job! We are now analyzing your responses.",
+        description: "Great job! We are analyzing your responses. Your results will be available in your Interview History shortly.",
       });
 
       onComplete(updatedInterview);

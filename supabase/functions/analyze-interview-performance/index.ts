@@ -75,9 +75,20 @@ Deno.serve(async (req) => {
     const response = await result.response
     const text = response.text()
     
-    // Clean and parse JSON
-    const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim()
-    const analysis = JSON.parse(jsonString)
+    // Clean and parse JSON more robustly
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("Gemini response:", text);
+      throw new Error("No valid JSON object found in Gemini response.");
+    }
+    const jsonString = jsonMatch[0];
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonString)
+    } catch (e) {
+      console.error("Failed to parse JSON:", jsonString);
+      throw new Error(`Failed to parse JSON from Gemini response. Details: ${e.message}`);
+    }
 
     // 4. Update the mock_interviews table
     const { error: updateError } = await supabaseAdmin
@@ -97,4 +108,3 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })
-
