@@ -16,7 +16,7 @@ import {
   Pause
 } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
-import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -34,11 +34,11 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 }) => {
   const { user } = useAuth();
   const camera = useCamera();
-  const audioRecorder = useAudioRecorder();
+  const speechRecognition = useSpeechRecognition();
   
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [questionLoading, setQuestionLoading] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
+  const [savingAnswer, setSavingAnswer] = useState(false);
   const [questionTime, setQuestionTime] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -49,12 +49,21 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
   const startTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
+    if (!speechRecognition.isSupported) {
+      toast({
+        title: "Speech Recognition Not Supported",
+        description: "Your browser doesn't support speech recognition. Please use Chrome, Edge, or Safari.",
+        variant: "destructive",
+      });
+    }
+    
     initializeInterview();
     startTimers();
     
     return () => {
       stopTimers();
       camera.stopCamera();
+      speechRecognition.stopListening();
     };
   }, []);
 
@@ -178,44 +187,42 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
   };
 
   const handleAnswer = async () => {
-    if (!audioRecorder.isRecording) {
+    if (!speechRecognition.isListening) {
       // Start recording
       try {
-        await audioRecorder.startRecording();
+        speechRecognition.resetTranscript();
+        await speechRecognition.startListening();
         toast({
-          title: "Recording Started",
+          title: "Listening Started",
           description: "Speak your answer. Click the mic again when finished.",
         });
       } catch (error) {
         toast({
-          title: "Recording Error",
-          description: "Failed to start audio recording.",
+          title: "Speech Recognition Error",
+          description: "Failed to start speech recognition.",
           variant: "destructive",
         });
       }
     } else {
-      // Stop recording and transcribe
+      // Stop recording and save answer
       try {
-        setTranscribing(true);
-        const audioBase64 = await audioRecorder.stopRecording();
+        setSavingAnswer(true);
+        speechRecognition.stopListening();
         
-        if (audioBase64) {
-          // Send to speech-to-text service
-          const response = await fetch(`https://mtwkqxnsabqadrrxpdwl.functions.supabase.co/speech-to-text`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ audio: audioBase64 })
-          });
-
-          const data = await response.json();
+        // Wait a moment for final transcript
+        setTimeout(async () => {
+          const transcribedText = speechRecognition.transcript.trim();
           
-          if (!response.ok) {
-            throw new Error(data.error || 'Failed to transcribe audio');
+          if (!transcribedText) {
+            toast({
+              title: "No Speech Detected",
+              description: "Please try speaking your answer again.",
+              variant: "destructive",
+            });
+            setSavingAnswer(false);
+            return;
           }
 
-          const transcribedText = data.text;
           console.log('Transcribed text:', transcribedText);
 
           // Save answer to database
@@ -223,7 +230,8 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
           
           // Load next question
           await loadOrGenerateQuestion();
-        }
+          setSavingAnswer(false);
+        }, 1000);
       } catch (error) {
         console.error('Error processing answer:', error);
         toast({
@@ -231,8 +239,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
           description: "Failed to process your answer.",
           variant: "destructive",
         });
-      } finally {
-        setTranscribing(false);
+        setSavingAnswer(false);
       }
     }
   };
@@ -403,10 +410,9 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
                     {camera.isActive ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                   </Button>
                 </div>
-                {audioRecorder.audioLevel > 0 && (
+                {speechRecognition.isListening && (
                   <div className="absolute bottom-4 right-4">
-                    <div className="bg-green-500 rounded-full animate-pulse" 
-                         style={{ width: `${8 + audioRecorder.audioLevel * 12}px`, height: `${8 + audioRecorder.audioLevel * 12}px` }} />
+                    <div className="bg-red-500 rounded-full w-4 h-4 animate-pulse" />
                   </div>
                 )}
               </div>
@@ -433,16 +439,16 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
                   <div className="flex justify-center">
                     <Button
                       onClick={handleAnswer}
-                      disabled={transcribing || isPaused}
+                      disabled={savingAnswer || isPaused || !speechRecognition.isSupported}
                       size="lg"
-                      className={`${audioRecorder.isRecording ? 'bg-red-500 hover:bg-red-600' : ''} transition-colors`}
+                      className={`${speechRecognition.isListening ? 'bg-red-500 hover:bg-red-600' : ''} transition-colors`}
                     >
-                      {transcribing ? (
+                      {savingAnswer ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Transcribing...
+                          Saving Answer...
                         </>
-                      ) : audioRecorder.isRecording ? (
+                      ) : speechRecognition.isListening ? (
                         <>
                           <MicOff className="w-4 h-4 mr-2" />
                           Stop Recording
@@ -456,12 +462,30 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
                     </Button>
                   </div>
 
-                  {audioRecorder.isRecording && (
+                  {speechRecognition.isListening && (
                     <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Recording... Click stop when finished</p>
+                      <p className="text-sm text-muted-foreground">Listening... Click stop when finished</p>
                       <div className="mt-2 flex justify-center">
                         <div className="bg-red-500 rounded-full w-3 h-3 animate-pulse"></div>
                       </div>
+                      {speechRecognition.transcript && (
+                        <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
+                          <p className="text-muted-foreground">Live transcript:</p>
+                          <p>{speechRecognition.transcript}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {speechRecognition.error && (
+                    <div className="text-center text-red-500 text-sm">
+                      {speechRecognition.error}
+                    </div>
+                  )}
+
+                  {!speechRecognition.isSupported && (
+                    <div className="text-center text-orange-500 text-sm">
+                      Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.
                     </div>
                   )}
                 </div>
