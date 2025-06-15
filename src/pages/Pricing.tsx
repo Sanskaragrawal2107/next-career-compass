@@ -115,7 +115,7 @@ const Pricing = () => {
           </Button>
           <div className="flex items-center space-x-3">
             <img 
-              src="/lovable-uploads/813d9d8b-5d4a-4774-a660-04b008430712.png" 
+              src="/lovable-uploads/724f43fd-89c1-4a5b-8581-8e1734eb2353.png" 
               alt="CareerBoost AI Logo" 
               className="w-10 h-10"
             />
