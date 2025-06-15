@@ -14,6 +14,9 @@ serve(async (req) => {
   }
 
   try {
+    const body = await req.json();
+    console.log('Received request with body:', JSON.stringify(body, null, 2));
+
     const { 
       interviewId, 
       jobTitle, 
@@ -22,7 +25,7 @@ serve(async (req) => {
       userAnswer = '',
       questionNumber = 1,
       userSkills = {}
-    } = await req.json();
+    } = body;
 
     console.log('Generating interview question for:', { jobTitle, interviewType, questionNumber });
 
@@ -64,7 +67,17 @@ Requirements:
 
 Generate just the question text, nothing else:`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${Deno.env.get('GEMINI_API_KEY')}`, {
+    console.log("--- PROMPT START ---");
+    console.log(prompt);
+    console.log("--- PROMPT END ---");
+    
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      console.error('GEMINI_API_KEY is not set in environment variables.');
+      throw new Error('Server configuration error: Missing API key.');
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -82,16 +95,18 @@ Generate just the question text, nothing else:`;
       }),
     });
 
+    const responseText = await response.text();
+    console.log('Gemini API response status:', response.status);
+    console.log('Gemini API response text:', responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
-      throw new Error(`Gemini API error: ${errorText}`);
+      throw new Error(`Gemini API error: ${responseText}`);
     }
 
-    const result = await response.json();
+    const result = JSON.parse(responseText);
     
-    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
-      console.error('Invalid Gemini response:', result);
+    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content?.parts?.[0]?.text) {
+      console.error('Invalid Gemini response structure:', JSON.stringify(result, null, 2));
       throw new Error('Invalid response from Gemini API');
     }
     
@@ -119,6 +134,8 @@ Generate just the question text, nothing else:`;
       console.error('Database error:', questionError);
       throw new Error(`Database error: ${questionError.message}`);
     }
+
+    console.log('Successfully saved question to DB. ID:', questionData.id);
 
     return new Response(
       JSON.stringify({ 
