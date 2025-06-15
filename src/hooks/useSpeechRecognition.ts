@@ -20,46 +20,30 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   const maxRetries = 3;
   const finalTranscriptRef = useRef('');
 
-  // Check if Web Speech API is supported
   const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-
-  const startListeningFn = useRef<() => Promise<void>>();
+  
   const isListeningStateRef = useRef(isListening);
   isListeningStateRef.current = isListening;
 
   const cleanup = useCallback(() => {
     if (recognitionRef.current) {
       try {
-        // Detach handlers to prevent them from firing during or after cleanup
         recognitionRef.current.onstart = null;
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
         recognitionRef.current.onend = null;
         recognitionRef.current.stop();
       } catch (e) {
-        // Ignore errors on stop
+        // Ignore errors on stop, which can happen if not running
       }
       recognitionRef.current = null;
     }
-    // Don't set isListening here, it's handled by callers to avoid race conditions.
   }, []);
 
-  const startListening = useCallback(async () => {
-    if (!isSupported) {
-      setError('Speech recognition is not supported in this browser');
-      return;
-    }
-
-    if (isListeningStateRef.current) {
-      console.log('Already listening, returning.');
-      return;
-    }
-
-    setIsListening(true); // Set listening status immediately
+  const coreStart = useCallback(async () => {
+    cleanup();
 
     try {
-      cleanup(); // Clean up any previous instance
-
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       recognitionRef.current = recognition;
@@ -71,24 +55,24 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
 
       recognition.onstart = () => {
         console.log('Speech recognition started successfully');
-        setError(null); // Clear any previous errors (like retry messages)
+        setError(null);
         retryCountRef.current = 0;
-        finalTranscriptRef.current = ''; // Reset transcript on new start
       };
 
       recognition.onresult = (event: any) => {
         let interimTranscript = '';
+        let finalTranscriptResult = finalTranscriptRef.current;
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcriptPart = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscriptRef.current += transcriptPart + ' ';
+            finalTranscriptResult += transcriptPart + ' ';
           } else {
             interimTranscript += transcriptPart;
           }
         }
-        
-        setTranscript(finalTranscriptRef.current + interimTranscript);
+        finalTranscriptRef.current = finalTranscriptResult;
+        setTranscript(finalTranscriptResult + interimTranscript);
       };
 
       recognition.onerror = (event: any) => {
@@ -101,7 +85,7 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
               setError(`Network error - retrying (${retryCountRef.current}/${maxRetries})...`);
             } else {
               setError('Network connection failed. Please check your internet connection and try again.');
-              setIsListening(false); // Give up
+              setIsListening(false);
             }
             break;
           case 'not-allowed':
@@ -109,16 +93,14 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
             setIsListening(false);
             break;
           case 'no-speech':
-            setError('No speech detected. Please try speaking again.');
-            // Let onend handle restart
+            console.log('No speech detected. The service will restart.');
             break;
           case 'audio-capture':
             setError('No microphone found. Please connect a microphone and try again.');
             setIsListening(false);
             break;
           case 'aborted':
-            // User-initiated stop, this is fine.
-            setIsListening(false);
+            console.log('Speech recognition aborted.');
             break;
           default:
             setError(`Speech recognition error: ${event.error}. Please try again.`);
@@ -129,11 +111,10 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
       recognition.onend = () => {
         console.log('Speech recognition ended');
         if (isListeningStateRef.current) {
-          console.log('Restarting recognition after it ended...');
-          cleanup();
-          setTimeout(() => startListeningFn.current?.(), 100);
+          console.log('Restarting recognition...');
+          setTimeout(() => coreStart(), 100);
         } else {
-            cleanup(); // ensure cleanup if it stopped for any other reason
+          cleanup();
         }
       };
 
@@ -144,15 +125,20 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
       setIsListening(false);
       cleanup();
     }
-  }, [isSupported, cleanup]);
+  }, [cleanup]);
 
-  startListeningFn.current = startListening;
+  const startListening = useCallback(() => {
+    if (isListeningStateRef.current || !isSupported) {
+      return;
+    }
+    setError(null);
+    setIsListening(true);
+    coreStart();
+  }, [isSupported, coreStart]);
 
   const stopListening = useCallback(() => {
-    console.log('Manually stopping speech recognition');
-    setIsListening(false); // Signal to onend not to restart
+    setIsListening(false);
     cleanup();
-    setError(null);
   }, [cleanup]);
 
   const resetTranscript = useCallback(() => {
@@ -161,19 +147,13 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
     setError(null);
   }, []);
 
-  const stableStartListening = useCallback(() => {
-    if (!isListeningStateRef.current) {
-      startListeningFn.current?.();
-    }
-  }, []);
-
   return {
     isListening,
     transcript,
-    startListening: stableStartListening,
+    startListening,
     stopListening,
     resetTranscript,
     isSupported,
-    error
+    error,
   };
 };
