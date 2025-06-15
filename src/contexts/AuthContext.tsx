@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -120,8 +119,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching subscription:', error);
-        // Set default subscription if none found
-        setSubscription({ subscribed: false });
+        // For any existing user without subscription record, create one with access
+        console.log('Creating subscription record for existing user');
+        const { error: insertError } = await supabase
+          .from('subscribers')
+          .insert({
+            user_id: userId,
+            email: user?.email || '',
+            subscribed: true,
+            subscription_tier: 'yearly',
+            subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+          });
+
+        if (insertError) {
+          console.error('Error creating subscription:', insertError);
+          setSubscription({ subscribed: true }); // Default to subscribed for existing users
+        } else {
+          setSubscription({
+            subscribed: true,
+            subscription_tier: 'yearly',
+            subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          });
+        }
         return;
       }
 
@@ -133,7 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error fetching subscription:', error);
-      setSubscription({ subscribed: false });
+      // Default to subscribed for existing users
+      setSubscription({ subscribed: true });
     }
   };
 
