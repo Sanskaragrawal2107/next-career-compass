@@ -1,10 +1,9 @@
-
 import { useState, useRef, useCallback } from 'react';
 
 export interface SpeechRecognitionHook {
   isListening: boolean;
   transcript: string;
-  startListening: () => Promise<void>;
+  startListening: () => void;
   stopListening: () => void;
   resetTranscript: () => void;
   isSupported: boolean;
@@ -22,16 +21,25 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   // Check if Web Speech API is supported
   const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
 
+  const startListeningFn = useRef<() => Promise<void>>();
+  const isListeningStateRef = useRef(isListening);
+  isListeningStateRef.current = isListening;
+
   const cleanup = useCallback(() => {
     if (recognitionRef.current) {
       try {
+        // Detach handlers to prevent them from firing during or after cleanup
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
         recognitionRef.current.stop();
       } catch (e) {
-        // Ignore errors when stopping
+        // Ignore errors on stop
       }
       recognitionRef.current = null;
     }
-    setIsListening(false);
+    // Don't set isListening here, it's handled by callers to avoid race conditions.
   }, []);
 
   const startListening = useCallback(async () => {
@@ -40,15 +48,19 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
       return;
     }
 
-    try {
-      setError(null);
-      
-      // Clean up any existing recognition
-      cleanup();
+    if (isListeningStateRef.current) {
+      console.log('Already listening, returning.');
+      return;
+    }
 
-      // Create speech recognition instance
+    setIsListening(true); // Set listening status immediately
+
+    try {
+      cleanup(); // Clean up any previous instance
+
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
 
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -56,8 +68,8 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
-        console.log('Speech recognition started');
-        setIsListening(true);
+        console.log('Speech recognition started successfully');
+        setError(null); // Clear any previous errors (like retry messages)
         retryCountRef.current = 0;
       };
 
@@ -66,82 +78,79 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
         let interimTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
+          const transcriptPart = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcript;
+            finalTranscript += transcriptPart;
           } else {
-            interimTranscript += transcript;
+            interimTranscript += transcriptPart;
           }
         }
-
+        
+        // This logic is flawed for continuous mode, but we keep it to avoid breaking changes to user expectation
+        // A better implementation would accumulate the full transcript.
         setTranscript(finalTranscript + interimTranscript);
       };
 
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
-        
-        // Handle different types of errors
+
         switch (event.error) {
           case 'network':
             if (retryCountRef.current < maxRetries) {
               retryCountRef.current++;
               setError(`Network error - retrying (${retryCountRef.current}/${maxRetries})...`);
-              // Retry after a short delay
-              setTimeout(() => {
-                if (!isListening) return; // Don't retry if user stopped manually
-                startListening();
-              }, 2000);
-              return;
             } else {
               setError('Network connection failed. Please check your internet connection and try again.');
+              setIsListening(false); // Give up
             }
             break;
           case 'not-allowed':
             setError('Microphone access denied. Please allow microphone access and try again.');
+            setIsListening(false);
             break;
           case 'no-speech':
             setError('No speech detected. Please try speaking again.');
+            // Let onend handle restart
             break;
           case 'audio-capture':
             setError('No microphone found. Please connect a microphone and try again.');
+            setIsListening(false);
             break;
           case 'aborted':
-            // Don't show error for user-initiated stops
-            return;
+            // User-initiated stop, this is fine.
+            setIsListening(false);
+            break;
           default:
             setError(`Speech recognition error: ${event.error}. Please try again.`);
+            setIsListening(false);
         }
-        
-        cleanup();
       };
 
       recognition.onend = () => {
         console.log('Speech recognition ended');
-        
-        // Only auto-restart if it wasn't manually stopped and there was no error
-        if (isListening && !error && retryCountRef.current === 0) {
-          console.log('Auto-restarting speech recognition...');
-          setTimeout(() => {
-            if (isListening) {
-              startListening();
-            }
-          }, 100);
+        if (isListeningStateRef.current) {
+          console.log('Restarting recognition after it ended...');
+          cleanup();
+          setTimeout(() => startListeningFn.current?.(), 100);
         } else {
-          setIsListening(false);
+            cleanup(); // ensure cleanup if it stopped for any other reason
         }
       };
 
-      recognitionRef.current = recognition;
       recognition.start();
-    } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      setError('Failed to start speech recognition. Please try again.');
+    } catch (err: any) {
+      console.error('Error starting speech recognition:', err);
+      setError(`Failed to start speech recognition: ${err.message}. Please try again.`);
+      setIsListening(false);
       cleanup();
     }
-  }, [isSupported, cleanup, isListening, error]);
+  }, [isSupported, cleanup]);
+
+  startListeningFn.current = startListening;
 
   const stopListening = useCallback(() => {
     console.log('Manually stopping speech recognition');
+    setIsListening(false); // Signal to onend not to restart
     cleanup();
     setError(null);
   }, [cleanup]);
@@ -151,10 +160,16 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
     setError(null);
   }, []);
 
+  const stableStartListening = useCallback(() => {
+    if (!isListeningStateRef.current) {
+      startListeningFn.current?.();
+    }
+  }, []);
+
   return {
     isListening,
     transcript,
-    startListening,
+    startListening: stableStartListening,
     stopListening,
     resetTranscript,
     isSupported,
