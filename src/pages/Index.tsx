@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -24,10 +23,12 @@ import {
   Sparkles,
   Globe,
   Play,
+  Mail,
   ChevronDown
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthModal from '@/components/AuthModal';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -114,6 +115,33 @@ const Index = () => {
     { value: '95%', label: 'Success Rate' },
     { value: '2.5x', label: 'Faster Job Search' },
     { value: '40%', label: 'Average Salary Increase' }
+  ];
+
+  const faqs = [
+    {
+      question: 'What is CareerBoost AI and how does it work?',
+      answer: 'CareerBoost AI is a comprehensive platform that uses artificial intelligence to help you land your dream job. It analyzes your resume, matches you with suitable jobs, identifies skill gaps, and prepares you for interviews. Our AI processes your information to provide personalized recommendations and data-driven insights for career growth.',
+    },
+    {
+      question: 'Is this platform suitable for both freshers and experienced professionals?',
+      answer: 'Absolutely! CareerBoost AI is designed for everyone, from recent graduates looking for their first job to seasoned professionals aiming for a career change or promotion. The tools and recommendations are tailored to your individual experience level and career goals.',
+    },
+    {
+      question: 'How does the AI resume analysis improve my job chances?',
+      answer: 'Our AI scans your resume for key skills, experience, and formatting, comparing it against thousands of successful resumes and job descriptions. It provides a detailed report on how to optimize it for Applicant Tracking Systems (ATS) and human recruiters, increasing your chances of getting shortlisted by over 2.5x.',
+    },
+    {
+      question: 'Is my data safe and private?',
+      answer: 'Yes, data security and privacy are our top priorities. We use industry-standard encryption and security protocols to protect your personal information. Your data is used solely to provide you with our career services and is never shared with third parties without your consent.',
+    },
+    {
+      question: 'How is CareerBoost AI different from job portals like Naukri or LinkedIn?',
+      answer: 'While traditional job portals are primarily search engines for job listings, CareerBoost AI is a complete career development co-pilot. We don’t just show you jobs; we actively help you become the best candidate. Our platform offers end-to-end support, including resume building, skill development roadmaps, and mock interview practice, which is something other portals don’t provide.',
+    },
+    {
+      question: 'What kind of support can I expect after subscribing?',
+      answer: 'Subscribed members get priority support from our career experts. You can reach out to us via email for any queries regarding the platform, your reports, or general career advice. Our support email is spprtcareersarthi@gmail.com.'
+    }
   ];
 
   if (loading) {
@@ -295,6 +323,33 @@ const Index = () => {
         </div>
       </section>
 
+      {/* FAQ Section */}
+      <section className="container mx-auto px-4 py-24">
+        <div className="text-center mb-16">
+          <Badge className="mb-6 bg-green-100 text-green-800 border-green-200">FAQs</Badge>
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            Find answers to common questions about CareerBoost AI.
+          </p>
+        </div>
+        <div className="max-w-4xl mx-auto bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-lg">
+          <Accordion type="single" collapsible className="w-full">
+            {faqs.map((faq, index) => (
+              <AccordionItem value={`item-${index}`} key={index} className={index === faqs.length - 1 ? 'border-b-0' : ''}>
+                <AccordionTrigger className="text-lg font-semibold text-left hover:no-underline">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-gray-600 text-base leading-relaxed pt-2">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-24 text-center bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl my-20 text-white">
         <div className="max-w-4xl mx-auto">
@@ -324,6 +379,30 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-white/70 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left space-y-4 md:space-y-0">
+            <div>
+              <div className="flex items-center justify-center md:justify-start space-x-2 mb-2">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xl font-bold text-gray-900">CareerBoost AI</span>
+              </div>
+              <p className="text-gray-600 text-sm">© {new Date().getFullYear()} CareerBoost AI. All rights reserved.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 mb-2">Contact Us</p>
+              <a href="mailto:spprtcareersarthi@gmail.com" className="flex items-center justify-center md:justify-start text-gray-800 hover:text-blue-600 transition-colors">
+                <Mail className="w-4 h-4 mr-2" />
+                spprtcareersarthi@gmail.com
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Auth Modal */}
       <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
