@@ -52,37 +52,43 @@ const Index = () => {
       icon: Brain,
       title: 'AI Resume Analysis',
       description: 'Advanced AI extracts and analyzes skills from your resume with 95%+ accuracy',
-      highlight: 'Smart Extraction'
+      highlight: 'Smart Extraction',
+      color: 'from-pink-500 to-pink-600'
     },
     {
       icon: Target,
       title: 'Job Matching Engine',
       description: 'Get personalized job recommendations based on your skills and experience',
-      highlight: 'Perfect Matches'
+      highlight: 'Perfect Matches',
+      color: 'from-blue-500 to-blue-600'
     },
     {
       icon: TrendingUp,
       title: 'Skill Gap Analysis',
       description: 'Identify missing skills and get detailed roadmaps for career advancement',
-      highlight: 'Career Growth'
+      highlight: 'Career Growth',
+      color: 'from-green-500 to-green-600'
     },
     {
       icon: FileCheck,
       title: 'ATS-Optimized Resumes',
       description: 'Generate resumes that pass Applicant Tracking Systems with ease',
-      highlight: 'ATS Ready'
+      highlight: 'ATS Ready',
+      color: 'from-orange-500 to-orange-600'
     },
     {
       icon: MessageSquare,
       title: 'Mock Interview Practice',
       description: 'Practice with AI-powered mock interviews and get detailed feedback',
-      highlight: 'Interview Ready'
+      highlight: 'Interview Ready',
+      color: 'from-pink-500 to-purple-600'
     },
     {
       icon: BarChart3,
       title: 'Analytics & Reports',
       description: 'Track your progress with detailed analytics and exportable reports',
-      highlight: 'Data Driven'
+      highlight: 'Data Driven',
+      color: 'from-blue-500 to-green-500'
     }
   ];
 
@@ -476,7 +482,7 @@ const Index = () => {
     },
     {
       question: 'What are the most impressive questions to ask an interviewer in 2025?',
-      answer: 'Ask forward-looking questions. Examples: "How is the team leveraging AI to improve its processes?", "What is the company\'s strategy for continuous learning and upskilling?", "How do you measure success for this role beyond the initial job description?".',
+      answer: 'Ask forward-looking questions. Examples: "How is the team leveraging AI to improve its processes?", "What is the company\'s strategy for continuous learning and upskilling?", "How do you measure success for this role beyond the initial job description?"',
     },
     // Global Career Trends
     {
@@ -534,15 +540,16 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-blue-50 to-green-50">
       {/* Header */}
-      <header className="container mx-auto px-4 py-6 sticky top-0 bg-white/80 backdrop-blur-md z-50 rounded-b-xl">
+      <header className="container mx-auto px-4 py-6 sticky top-0 bg-white/90 backdrop-blur-md z-50 rounded-b-xl shadow-sm">
         <nav className="flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-              <Brain className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-gray-900">CareerBoost AI</span>
+          <div className="flex items-center space-x-3">
+            <img 
+              src="/lovable-uploads/813d9d8b-5d4a-4774-a660-04b008430712.png" 
+              alt="CareerBoost AI Logo" 
+              className="h-12 w-auto"
+            />
             <Badge className="bg-green-100 text-green-800 border-green-200">Live</Badge>
           </div>
           
@@ -557,7 +564,7 @@ const Index = () => {
                 <Button variant="ghost" onClick={() => setAuthModalOpen(true)}>
                   Sign In
                 </Button>
-                <Button onClick={handleGetStarted} size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600">
+                <Button onClick={handleGetStarted} size="lg" className="bg-gradient-to-r from-pink-500 via-blue-500 to-green-500 hover:from-pink-600 hover:via-blue-600 hover:to-green-600">
                   Get Started Free
                   <Sparkles className="ml-2 w-4 h-4" />
                 </Button>
@@ -570,13 +577,13 @@ const Index = () => {
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="max-w-5xl mx-auto">
-          <Badge className="mb-6 bg-blue-100 text-blue-800 border-blue-200 text-lg px-4 py-2">
+          <Badge className="mb-6 bg-gradient-to-r from-pink-100 to-blue-100 text-gray-800 border-0 text-lg px-4 py-2">
             🚀 India's #1 AI Career Platform
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-8 leading-tight">
             Land Your{' '}
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-pink-500 via-blue-500 via-green-500 to-orange-500 bg-clip-text text-transparent">
               Dream Job
             </span>{' '}
             with AI Power
@@ -588,11 +595,11 @@ const Index = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
-            <Button size="lg" onClick={handleGetStarted} className="text-xl px-12 py-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl">
+            <Button size="lg" onClick={handleGetStarted} className="text-xl px-12 py-8 bg-gradient-to-r from-pink-500 via-blue-500 to-green-500 hover:from-pink-600 hover:via-blue-600 hover:to-green-600 shadow-2xl">
               Start Free Analysis
               <ArrowRight className="ml-3 w-6 h-6" />
             </Button>
-            <Button size="lg" variant="outline" className="text-xl px-12 py-8 border-2 hover:bg-gray-50">
+            <Button size="lg" variant="outline" className="text-xl px-12 py-8 border-2 hover:bg-gradient-to-r hover:from-pink-50 hover:to-blue-50">
               <Play className="mr-3 w-6 h-6" />
               Watch Demo
             </Button>
@@ -602,7 +609,7 @@ const Index = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                <div className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-blue-500 to-green-500 bg-clip-text text-transparent mb-2">
                   {stat.value}
                 </div>
                 <div className="text-gray-600 font-medium">{stat.label}</div>
@@ -629,7 +636,7 @@ const Index = () => {
       {/* Features */}
       <section className="container mx-auto px-4 py-24 bg-white/70 rounded-3xl my-20 backdrop-blur-sm">
         <div className="text-center mb-20">
-          <Badge className="mb-6 bg-purple-100 text-purple-800 border-purple-200">Complete Career Solution</Badge>
+          <Badge className="mb-6 bg-gradient-to-r from-purple-100 to-blue-100 text-gray-800 border-0">Complete Career Solution</Badge>
           <h2 className="text-5xl font-bold text-gray-900 mb-6">
             Everything You Need to Succeed
           </h2>
@@ -643,7 +650,7 @@ const Index = () => {
             <Card key={index} className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br from-white to-gray-50">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                  <div className={`w-14 h-14 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center`}>
                     <feature.icon className="w-7 h-7 text-white" />
                   </div>
                   <Badge variant="secondary" className="bg-green-100 text-green-800">
@@ -687,7 +694,7 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                  <div className={`w-12 h-12 bg-gradient-to-r ${index % 4 === 0 ? 'from-pink-500 to-pink-600' : index % 4 === 1 ? 'from-blue-500 to-blue-600' : index % 4 === 2 ? 'from-green-500 to-green-600' : 'from-orange-500 to-orange-600'} rounded-full flex items-center justify-center`}>
                     <span className="text-white font-bold">{testimonial.name[0]}</span>
                   </div>
                   <div>
@@ -729,7 +736,7 @@ const Index = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="container mx-auto px-4 py-24 text-center bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl my-20 text-white">
+      <section className="container mx-auto px-4 py-24 text-center bg-gradient-to-r from-pink-500 via-blue-500 to-green-500 rounded-3xl my-20 text-white">
         <div className="max-w-4xl mx-auto">
           <Badge className="mb-6 bg-white/20 text-white border-white/30">Limited Time Offer</Badge>
           <h2 className="text-5xl font-bold mb-6">
@@ -764,10 +771,11 @@ const Index = () => {
           <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left space-y-4 md:space-y-0">
             <div>
               <div className="flex items-center justify-center md:justify-start space-x-2 mb-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">CareerBoost AI</span>
+                <img 
+                  src="/lovable-uploads/813d9d8b-5d4a-4774-a660-04b008430712.png" 
+                  alt="CareerBoost AI Logo" 
+                  className="h-8 w-auto"
+                />
               </div>
               <p className="text-gray-600 text-sm">© {new Date().getFullYear()} CareerBoost AI. All rights reserved.</p>
             </div>
