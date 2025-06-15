@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -118,6 +119,194 @@ const Index = () => {
   ];
 
   const faqs = [
+    // Resume Writing FAQs
+    {
+      question: 'How to write a perfect resume in 2024?',
+      answer: 'A perfect resume in 2024 should be ATS-friendly, include relevant keywords, be concise (1-2 pages), have a clean format, include quantifiable achievements, and be tailored to each job application. Use action verbs, include a professional summary, and ensure contact information is up-to-date.',
+    },
+    {
+      question: 'What is an ATS-friendly resume and why is it important?',
+      answer: 'An ATS (Applicant Tracking System) friendly resume is designed to be easily read by software that screens resumes before they reach human recruiters. It uses standard fonts, clear headings, avoids graphics/tables, includes relevant keywords, and follows a simple format. 95% of Fortune 500 companies use ATS, making this crucial for job seekers.',
+    },
+    {
+      question: 'How long should a resume be in 2024?',
+      answer: 'For most professionals, a resume should be 1-2 pages. Entry-level candidates should aim for 1 page, experienced professionals can use 2 pages, and senior executives or academics may extend to 3 pages if necessary. The key is relevance - every line should add value.',
+    },
+    {
+      question: 'What are the most important sections to include in a resume?',
+      answer: 'Essential resume sections include: Contact Information, Professional Summary/Objective, Work Experience, Education, Skills, and Certifications. Optional sections can include Projects, Volunteer Work, Languages, Publications, or Awards based on relevance to the target role.',
+    },
+    {
+      question: 'How to write resume bullet points that get noticed?',
+      answer: 'Use the STAR method (Situation, Task, Action, Result) or CAR method (Challenge, Action, Result). Start with action verbs, include quantifiable results, focus on achievements rather than duties, and tailor to job requirements. Example: "Increased sales by 30% in 6 months by implementing new lead generation strategy."',
+    },
+    {
+      question: 'Should I include a photo on my resume?',
+      answer: 'In most countries including the US, UK, and India, photos on resumes are not recommended and can lead to unconscious bias. However, in some European countries like Germany, photos are common. Research local customs or ask CareerBoost AI for region-specific advice.',
+    },
+    {
+      question: 'How to handle employment gaps in a resume?',
+      answer: 'Be honest about gaps but frame them positively. If you were unemployed, mention any freelancing, volunteering, education, or skill development. Use years instead of months if helpful. Include a brief explanation in your cover letter. Focus on what you learned during the gap.',
+    },
+    {
+      question: 'What resume format is best for my industry?',
+      answer: 'Chronological format works best for traditional industries and steady career progression. Functional format suits career changers or those with gaps. Hybrid/combination format works for most professionals. Creative industries may allow more design freedom, while conservative fields prefer traditional formats.',
+    },
+    // Job Search FAQs
+    {
+      question: 'How to find a job quickly in 2024?',
+      answer: 'To find a job quickly: optimize your resume and LinkedIn profile, apply to 10-15 jobs daily, network actively, use multiple job boards, consider recruiters, prepare for interviews, follow up on applications, and be open to contract or temporary positions that can lead to permanent roles.',
+    },
+    {
+      question: 'What are the best job search websites in India?',
+      answer: 'Top job portals in India include Naukri.com, LinkedIn, Indeed, Monster India, Shine.com, TimesJobs, Glassdoor, AngelList (for startups), Instahyre, and company career pages. Each platform has its strengths - use multiple platforms for maximum reach.',
+    },
+    {
+      question: 'How to negotiate salary effectively?',
+      answer: 'Research market rates for your role, document your achievements, practice your pitch, timing is crucial (after job offer), consider the entire package (not just base salary), be professional and confident, have a backup plan, and be prepared to walk away if the offer is significantly below expectations.',
+    },
+    {
+      question: 'How important is networking for job search?',
+      answer: 'Networking is crucial - 70-80% of jobs are never publicly advertised. Build genuine relationships, attend industry events, use LinkedIn strategically, join professional associations, alumni networks, and don\'t just network when job hunting. Maintain relationships year-round.',
+    },
+    {
+      question: 'How to optimize LinkedIn profile for job search?',
+      answer: 'Use a professional headshot, write a compelling headline, craft a detailed summary, include relevant keywords, showcase achievements with metrics, get recommendations, post industry-relevant content, engage with your network, and ensure your profile is 100% complete.',
+    },
+    // Interview Preparation FAQs
+    {
+      question: 'How to prepare for a job interview in 1 week?',
+      answer: 'Research the company and role thoroughly, practice common interview questions, prepare your STAR stories, plan your outfit, prepare questions to ask, review your resume, practice with mock interviews, research the interviewer on LinkedIn, and plan your route to the interview location.',
+    },
+    {
+      question: 'What are the most common interview questions and answers?',
+      answer: 'Common questions include: "Tell me about yourself," "Why do you want this job?," "What are your strengths/weaknesses?," "Where do you see yourself in 5 years?," "Why are you leaving your current job?," and "Do you have any questions?" Prepare authentic, specific answers using the STAR method.',
+    },
+    {
+      question: 'How to handle behavioral interview questions?',
+      answer: 'Use the STAR method: Situation (set context), Task (explain what needed to be done), Action (describe what you did), Result (share the outcome). Prepare 5-7 stories covering different skills like leadership, problem-solving, teamwork, and conflict resolution.',
+    },
+    {
+      question: 'What should I wear to a job interview?',
+      answer: 'Dress one level above the company\'s daily dress code. For corporate roles, opt for business professional. For startups, business casual may suffice. Ensure clothes are clean, well-fitted, and conservative. When in doubt, it\'s better to be slightly overdressed than underdressed.',
+    },
+    {
+      question: 'How to answer "What is your expected salary?" question?',
+      answer: 'Research salary ranges for the role, consider your experience and location, provide a range rather than specific number, mention that you\'re open to negotiation, and emphasize your interest in the role and growth opportunities beyond just compensation.',
+    },
+    // Career Development FAQs
+    {
+      question: 'How to change careers successfully?',
+      answer: 'Identify transferable skills, research target industry requirements, network with professionals in new field, consider additional education/certifications, start with informational interviews, possibly take on projects in new area, be prepared for potential salary reduction initially, and leverage CareerBoost AI for personalized guidance.',
+    },
+    {
+      question: 'What skills are most in demand in 2024?',
+      answer: 'High-demand skills include: AI/Machine Learning, Data Analysis, Cloud Computing, Cybersecurity, Digital Marketing, Project Management, UX/UI Design, Software Development, Emotional Intelligence, and Adaptability. Technical skills combined with soft skills create the most valuable professionals.',
+    },
+    {
+      question: 'How to get promoted at work?',
+      answer: 'Exceed performance expectations, take on additional responsibilities, build strong relationships, communicate achievements to your manager, seek feedback regularly, develop leadership skills, mentor others, stay updated with industry trends, and have regular career conversations with your supervisor.',
+    },
+    {
+      question: 'Should I quit my job without another offer?',
+      answer: 'Generally not recommended unless you have significant savings, are in an toxic environment, or have strong job prospects. Consider: your financial situation, job market conditions, industry demand, networking strength, and timeline for finding new role. Have 6-12 months of expenses saved ideally.',
+    },
+    {
+      question: 'How to build a personal brand for career growth?',
+      answer: 'Define your unique value proposition, be consistent across platforms, create valuable content in your expertise area, engage with industry conversations, speak at events, maintain professional online presence, ask for recommendations, and authentically showcase your personality and values.',
+    },
+    // Skill Development FAQs
+    {
+      question: 'How to identify skill gaps in my career?',
+      answer: 'Analyze job descriptions for target roles, get feedback from managers/peers, use skills assessment tools, compare your skills to industry leaders, review performance evaluations, consider market trends, and use platforms like CareerBoost AI for comprehensive skill gap analysis.',
+    },
+    {
+      question: 'What is the best way to learn new skills online?',
+      answer: 'Combine multiple learning methods: online courses (Coursera, Udemy, LinkedIn Learning), YouTube tutorials, industry blogs, podcasts, webinars, virtual conferences, online communities, and practical projects. Set specific learning goals and dedicate consistent time daily.',
+    },
+    {
+      question: 'How long does it take to learn a new skill?',
+      answer: 'Basic proficiency: 20-50 hours, functional competency: 100-200 hours, professional competency: 500+ hours. Timeline depends on complexity, prior knowledge, learning method, and practice frequency. Focus on practical application alongside theoretical learning.',
+    },
+    {
+      question: 'Are certifications worth it for career advancement?',
+      answer: 'Yes, if they\'re relevant to your field and recognized by employers. Priority certifications include: Google (Analytics, Ads), AWS/Azure (Cloud), PMP (Project Management), Salesforce, HubSpot (Marketing), and industry-specific credentials. Research ROI before investing.',
+    },
+    {
+      question: 'How to stay updated with industry trends?',
+      answer: 'Follow industry leaders on LinkedIn/Twitter, subscribe to relevant newsletters and blogs, attend webinars and conferences, join professional associations, participate in online communities, listen to industry podcasts, and set up Google Alerts for key topics.',
+    },
+    // Remote Work FAQs
+    {
+      question: 'How to find legitimate remote jobs?',
+      answer: 'Use reputable platforms like LinkedIn, AngelList, We Work Remotely, Remote.co, FlexJobs, and Upwork. Be cautious of scams - legitimate employers won\'t ask for upfront payments. Research companies thoroughly and verify job postings through official company websites.',
+    },
+    {
+      question: 'What skills are essential for remote work success?',
+      answer: 'Key remote work skills include: self-discipline, time management, clear communication, tech proficiency, problem-solving independence, video conferencing etiquette, digital collaboration, and maintaining work-life balance. Employers also value reliability and proactive communication.',
+    },
+    {
+      question: 'How to prepare for remote job interviews?',
+      answer: 'Test your technology beforehand, ensure good lighting and quiet environment, prepare for technical difficulties, practice video interviewing, have backup plans for connectivity issues, dress professionally (full outfit), and prepare questions about remote work culture and expectations.',
+    },
+    // Salary and Benefits FAQs
+    {
+      question: 'How to research salary expectations for a role?',
+      answer: 'Use salary research tools like Glassdoor, PayScale, Salary.com, LinkedIn Salary Insights, and AmbitionBox (for India). Consider location, company size, industry, your experience level, and current market conditions. Network contacts can provide insider information.',
+    },
+    {
+      question: 'When is the best time to ask for a raise?',
+      answer: 'Best timing: after completing major projects, during performance reviews, after receiving additional responsibilities, when company is performing well, or after gaining new certifications. Avoid during budget cuts, layoffs, or personal/company crises.',
+    },
+    {
+      question: 'What benefits should I negotiate besides salary?',
+      answer: 'Consider: flexible working arrangements, additional vacation days, professional development budget, stock options, better health insurance, retirement contributions, signing bonus, relocation assistance, equipment allowance, and career advancement opportunities.',
+    },
+    // Industry-Specific FAQs
+    {
+      question: 'How to break into the tech industry without a computer science degree?',
+      answer: 'Focus on building practical skills through coding bootcamps, online courses, and personal projects. Create a strong portfolio, contribute to open source projects, network with tech professionals, consider entry-level roles like QA or technical support, and highlight transferable skills from previous experience.',
+    },
+    {
+      question: 'What are the highest paying jobs in India right now?',
+      answer: 'Top paying roles include: Data Scientists, AI/ML Engineers, Cloud Architects, Investment Bankers, Management Consultants, Product Managers, Cybersecurity Specialists, DevOps Engineers, and Petroleum Engineers. Salaries vary by location, experience, and company size.',
+    },
+    {
+      question: 'How to transition from traditional industries to digital roles?',
+      answer: 'Identify digital skills relevant to your industry, take online courses, seek digital projects in current role, network with digital professionals, consider hybrid roles that combine traditional and digital skills, and highlight analytical and problem-solving abilities.',
+    },
+    // Freelancing and Entrepreneurship FAQs
+    {
+      question: 'How to start freelancing while working full-time?',
+      answer: 'Start small with weekend projects, ensure no conflict of interest with current employer, build portfolio gradually, set clear boundaries, save money for transition period, develop client relationships, and consider freelancing in different industry than full-time job initially.',
+    },
+    {
+      question: 'What are the pros and cons of freelancing vs full-time employment?',
+      answer: 'Freelancing pros: flexibility, potentially higher income, variety, autonomy. Cons: irregular income, no benefits, self-employment taxes, finding clients. Full-time pros: steady income, benefits, career growth, team collaboration. Cons: less flexibility, potential ceiling on income.',
+    },
+    // Job Market and Economic FAQs
+    {
+      question: 'How has the job market changed post-COVID?',
+      answer: 'Major changes include: increased remote work options, emphasis on digital skills, healthcare and tech job growth, automation acceleration, gig economy expansion, focus on employee wellbeing, virtual interviewing normalization, and increased importance of adaptability and resilience.',
+    },
+    {
+      question: 'What industries are growing fastest in India?',
+      answer: 'Fastest growing sectors include: Information Technology, E-commerce, FinTech, HealthTech, EdTech, Renewable Energy, Food Delivery, Digital Marketing, Cybersecurity, and Electric Vehicles. These sectors offer numerous opportunities for career growth.',
+    },
+    {
+      question: 'How to recession-proof your career?',
+      answer: 'Develop in-demand skills, build multiple income streams, maintain emergency fund, network continuously, stay updated with industry trends, become indispensable at work, consider recession-resistant industries (healthcare, utilities, food), and focus on continuous learning.',
+    },
+    // Age and Experience FAQs
+    {
+      question: 'How to find a job after 40 in India?',
+      answer: 'Leverage extensive experience, highlight leadership and mentoring abilities, stay current with technology, consider consulting or part-time roles, network extensively, target companies that value experience, be open to slightly lower positions initially, and emphasize stability and reliability.',
+    },
+    {
+      question: 'How can fresh graduates stand out in competitive job market?',
+      answer: 'Build relevant projects during college, gain internship experience, develop both technical and soft skills, create professional online presence, network with alumni and industry professionals, customize applications for each role, and demonstrate passion and willingness to learn.',
+    },
+    // Platform-Specific FAQs
     {
       question: 'What is CareerBoost AI and how does it work?',
       answer: 'CareerBoost AI is a comprehensive platform that uses artificial intelligence to help you land your dream job. It analyzes your resume, matches you with suitable jobs, identifies skill gaps, and prepares you for interviews. Our AI processes your information to provide personalized recommendations and data-driven insights for career growth.',
@@ -136,11 +325,11 @@ const Index = () => {
     },
     {
       question: 'How is CareerBoost AI different from job portals like Naukri or LinkedIn?',
-      answer: 'While traditional job portals are primarily search engines for job listings, CareerBoost AI is a complete career development co-pilot. We don’t just show you jobs; we actively help you become the best candidate. Our platform offers end-to-end support, including resume building, skill development roadmaps, and mock interview practice, which is something other portals don’t provide.',
+      answer: 'While traditional job portals are primarily search engines for job listings, CareerBoost AI is a complete career development co-pilot. We don\'t just show you jobs; we actively help you become the best candidate. Our platform offers end-to-end support, including resume building, skill development roadmaps, and mock interview practice, which is something other portals don\'t provide.',
     },
     {
       question: 'What kind of support can I expect after subscribing?',
-      answer: 'Subscribed members get priority support from our career experts. You can reach out to us via email for any queries regarding the platform, your reports, or general career advice. Our support email is spprtcareersarthi@gmail.com.'
+      answer: 'Subscribed members get priority support from our career experts. You can reach out to us via email for any queries regarding the platform, your reports, or general career advice. Our support email is spprtcareersarthi@gmail.com and we typically respond within 24 hours.'
     }
   ];
 
@@ -326,15 +515,15 @@ const Index = () => {
       {/* FAQ Section */}
       <section className="container mx-auto px-4 py-24">
         <div className="text-center mb-16">
-          <Badge className="mb-6 bg-green-100 text-green-800 border-green-200">FAQs</Badge>
+          <Badge className="mb-6 bg-green-100 text-green-800 border-green-200">Career Guidance FAQs</Badge>
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Frequently Asked Questions
+            Complete Career & Job Search Guide
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Find answers to common questions about CareerBoost AI.
+            Everything you need to know about resume writing, job search, interviews, career development, and professional growth - answered by career experts.
           </p>
         </div>
-        <div className="max-w-4xl mx-auto bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-lg">
+        <div className="max-w-6xl mx-auto bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-lg">
           <Accordion type="single" collapsible className="w-full">
             {faqs.map((faq, index) => (
               <AccordionItem value={`item-${index}`} key={index} className={index === faqs.length - 1 ? 'border-b-0' : ''}>
