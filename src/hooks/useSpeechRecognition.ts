@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback } from 'react';
 
 export interface SpeechRecognitionHook {
@@ -17,6 +18,7 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   const recognitionRef = useRef<any>(null);
   const retryCountRef = useRef(0);
   const maxRetries = 3;
+  const finalTranscriptRef = useRef('');
 
   // Check if Web Speech API is supported
   const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
@@ -71,24 +73,22 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
         console.log('Speech recognition started successfully');
         setError(null); // Clear any previous errors (like retry messages)
         retryCountRef.current = 0;
+        finalTranscriptRef.current = ''; // Reset transcript on new start
       };
 
       recognition.onresult = (event: any) => {
-        let finalTranscript = '';
         let interimTranscript = '';
-
+        
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcriptPart = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcriptPart;
+            finalTranscriptRef.current += transcriptPart + ' ';
           } else {
             interimTranscript += transcriptPart;
           }
         }
         
-        // This logic is flawed for continuous mode, but we keep it to avoid breaking changes to user expectation
-        // A better implementation would accumulate the full transcript.
-        setTranscript(finalTranscript + interimTranscript);
+        setTranscript(finalTranscriptRef.current + interimTranscript);
       };
 
       recognition.onerror = (event: any) => {
@@ -156,6 +156,7 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   }, [cleanup]);
 
   const resetTranscript = useCallback(() => {
+    finalTranscriptRef.current = '';
     setTranscript('');
     setError(null);
   }, []);
