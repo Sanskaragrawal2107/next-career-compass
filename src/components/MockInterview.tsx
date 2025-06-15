@@ -9,12 +9,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import InterviewSession from './InterviewSession';
 import InterviewHistory from './InterviewHistory';
+import InterviewResults from './InterviewResults';
 
 interface MockInterviewProps {}
 
 const MockInterview: React.FC<MockInterviewProps> = () => {
   const { user } = useAuth();
   const [activeInterview, setActiveInterview] = useState<any>(null);
+  const [completedInterview, setCompletedInterview] = useState<any>(null);
   const [recentInterviews, setRecentInterviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -69,6 +71,7 @@ const MockInterview: React.FC<MockInterviewProps> = () => {
   const startNewInterview = async (jobTitle: string, interviewType: string = 'technical') => {
     if (!user) return;
 
+    setCompletedInterview(null);
     setLoading(true);
     try {
       console.log('Starting new interview:', { jobTitle, interviewType });
@@ -105,8 +108,9 @@ const MockInterview: React.FC<MockInterviewProps> = () => {
     }
   };
 
-  const handleInterviewComplete = () => {
+  const handleInterviewComplete = (interview: any) => {
     setActiveInterview(null);
+    setCompletedInterview(interview);
     fetchRecentInterviews();
   };
 
@@ -117,9 +121,22 @@ const MockInterview: React.FC<MockInterviewProps> = () => {
         onSelectInterview={(interview) => {
           if (interview.status === 'in_progress') {
             setActiveInterview(interview);
+            setCompletedInterview(null);
+          } else if (interview.status === 'completed') {
+            setCompletedInterview(interview);
+            setActiveInterview(null);
           }
           setShowHistory(false);
         }}
+      />
+    );
+  }
+
+  if (completedInterview) {
+    return (
+      <InterviewResults 
+        interview={completedInterview}
+        onDone={() => setCompletedInterview(null)}
       />
     );
   }

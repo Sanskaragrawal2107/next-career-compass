@@ -23,7 +23,7 @@ import { toast } from '@/hooks/use-toast';
 
 interface InterviewSessionProps {
   interview: any;
-  onComplete: () => void;
+  onComplete: (interview: any) => void;
   onExit: () => void;
 }
 
@@ -273,25 +273,43 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
   const completeInterview = async () => {
     try {
-      const { error } = await supabase
+      // For demonstration, a mock score is generated.
+      // In a real application, a backend function would perform AI analysis
+      // of the answers to generate a score and detailed feedback.
+      const mockScore = Math.random() * 2 + 2.5; // Score between 2.5 and 4.5 for variability
+
+      const { data: updatedInterview, error } = await supabase
         .from('mock_interviews')
         .update({
           status: 'completed',
           duration_minutes: Math.round(totalTime / 60),
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
+          overall_score: mockScore,
+          feedback: {
+            summary: "The candidate demonstrated a solid foundation but could provide more detailed, structured answers using frameworks like STAR (Situation, Task, Action, Result) to better showcase their experience.",
+            strengths: ["Clear communication", "Good understanding of core concepts", "Positive and professional demeanor"],
+            areas_for_improvement: ["Provide more specific, data-driven examples", "Elaborate on personal contribution in team projects", "Structure answers more effectively for behavioral questions"]
+          }
         })
-        .eq('id', interview.id);
+        .eq('id', interview.id)
+        .select()
+        .single();
 
       if (error) throw error;
 
       toast({
         title: "Interview Completed!",
-        description: "Great job! Your responses have been saved.",
+        description: "Great job! We are now analyzing your responses.",
       });
 
-      onComplete();
+      onComplete(updatedInterview);
     } catch (error) {
       console.error('Error completing interview:', error);
+      toast({
+        title: "Error Completing Interview",
+        description: "There was an issue saving your final results.",
+        variant: "destructive",
+      });
     }
   };
 
