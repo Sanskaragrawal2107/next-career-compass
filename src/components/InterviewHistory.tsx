@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Clock, Trophy, Eye } from 'lucide-react';
+import { ArrowLeft, Clock, Trophy, Eye, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface InterviewHistoryProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ const InterviewHistory: React.FC<InterviewHistoryProps> = ({ onBack, onSelectInt
   const [interviews, setInterviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInterview, setSelectedInterview] = useState<any>(null);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -42,6 +44,37 @@ const InterviewHistory: React.FC<InterviewHistoryProps> = ({ onBack, onSelectInt
       console.error('Error fetching interviews:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerAnalysis = async (interviewId: string) => {
+    setAnalyzingId(interviewId);
+    try {
+      const { error } = await supabase.functions.invoke('analyze-interview-performance', {
+        body: { interviewId },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Analysis Started",
+        description: "Your interview is being analyzed. The results will be available here shortly.",
+      });
+
+      // Refetch interviews to update button states after a short delay
+      setTimeout(() => {
+        fetchInterviews();
+        setAnalyzingId(null);
+      }, 5000);
+
+    } catch (error: any) {
+      console.error('Error triggering analysis:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "We couldn't start the analysis. Please try again.",
+        variant: "destructive",
+      });
+      setAnalyzingId(null);
     }
   };
 
@@ -244,6 +277,22 @@ const InterviewHistory: React.FC<InterviewHistoryProps> = ({ onBack, onSelectInt
                         onClick={() => onSelectInterview(interview)}
                       >
                         View Results
+                      </Button>
+                    )}
+                    {interview.status === 'completed' && interview.overall_score === null && (
+                      <Button 
+                        size="sm"
+                        onClick={() => triggerAnalysis(interview.id)}
+                        disabled={analyzingId === interview.id}
+                      >
+                        {analyzingId === interview.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          'Analyze with AI'
+                        )}
                       </Button>
                     )}
                     {interview.status === 'in_progress' && (
