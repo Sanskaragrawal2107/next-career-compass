@@ -284,18 +284,23 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
           status: 'completed',
           duration_minutes: Math.round(totalTime / 60),
           completed_at: new Date().toISOString(),
-          overall_score: mockScore,
-          feedback: {
-            summary: "The candidate demonstrated a solid foundation but could provide more detailed, structured answers using frameworks like STAR (Situation, Task, Action, Result) to better showcase their experience.",
-            strengths: ["Clear communication", "Good understanding of core concepts", "Positive and professional demeanor"],
-            areas_for_improvement: ["Provide more specific, data-driven examples", "Elaborate on personal contribution in team projects", "Structure answers more effectively for behavioral questions"]
-          }
         })
         .eq('id', interview.id)
         .select()
         .single();
 
       if (error) throw error;
+
+      // Kick off the analysis in the background. No need to await.
+      supabase.functions.invoke('analyze-interview-performance', {
+        body: { interviewId: interview.id }
+      }).then(({ error: functionError }) => {
+        if (functionError) {
+          console.error("Error analyzing interview:", functionError);
+          // Optionally, you could update the interview status to 'analysis_failed'
+          // and show a message to the user.
+        }
+      });
 
       toast({
         title: "Interview Completed!",

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -239,6 +238,14 @@ const InterviewHistory: React.FC<InterviewHistoryProps> = ({ onBack, onSelectInt
                       <Eye className="w-4 h-4 mr-2" />
                       View Details
                     </Button>
+                    {interview.status === 'completed' && interview.overall_score !== null && (
+                      <Button 
+                        size="sm"
+                        onClick={() => onSelectInterview(interview)}
+                      >
+                        View Results
+                      </Button>
+                    )}
                     {interview.status === 'in_progress' && (
                       <Button 
                         size="sm"

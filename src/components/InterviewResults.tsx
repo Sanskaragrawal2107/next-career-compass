@@ -16,28 +16,49 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ interview, onDone }
   const [results, setResults] = useState<any>(null);
 
   useEffect(() => {
-    const fetchResults = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('mock_interviews')
-        .select('overall_score, feedback')
-        .eq('id', interview.id)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching interview results:', error);
-        toast({
-            title: "Error",
-            description: "Could not load interview results.",
-            variant: "destructive",
-        })
-      } else {
-        setResults(data);
-      }
-      setLoading(false);
+    const fetchAndPollResults = () => {
+      const poller = async () => {
+        const { data, error } = await supabase
+          .from('mock_interviews')
+          .select('overall_score, feedback')
+          .eq('id', interview.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching interview results:', error);
+          toast({
+              title: "Error",
+              description: "Could not load interview results.",
+              variant: "destructive",
+          })
+          setLoading(false);
+          return true; // Stop polling
+        }
+        
+        if (data && data.overall_score !== null) {
+          setResults(data);
+          setLoading(false);
+          return true; // Stop polling
+        }
+
+        return false; // Continue polling
+      };
+
+      poller().then(done => {
+        if (!done) {
+          const intervalId = setInterval(async () => {
+            const finished = await poller();
+            if (finished) {
+              clearInterval(intervalId);
+            }
+          }, 5000); // Poll every 5 seconds
+
+          return () => clearInterval(intervalId);
+        }
+      });
     };
 
-    fetchResults();
+    fetchAndPollResults();
   }, [interview.id]);
 
   const renderDecision = () => {
