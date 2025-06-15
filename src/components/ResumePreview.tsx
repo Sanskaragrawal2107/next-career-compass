@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Download, Edit, FileText, Share } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -28,23 +27,13 @@ const ResumePreview = ({ isOpen, onClose, resume }: ResumePreviewProps) => {
     
     setIsDownloading(true);
     try {
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: "Download failed",
-          description: "Please allow popups for this site to download the resume.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Write the resume content to the new window
-      printWindow.document.write(`
+      // Create a blob with the HTML content
+      const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
           <title>Resume - ${resume.job_title || 'Optimized Resume'}</title>
+          <meta charset="UTF-8">
           <style>
             body { 
               font-family: Arial, sans-serif; 
@@ -53,10 +42,11 @@ const ResumePreview = ({ isOpen, onClose, resume }: ResumePreviewProps) => {
               max-width: 800px; 
               margin: 0 auto; 
               padding: 20px;
+              background: white;
             }
             @media print {
               body { margin: 0; padding: 15px; }
-              .no-print { display: none; }
+              .no-print { display: none !important; }
             }
             h1, h2, h3 { color: #2563eb; margin-bottom: 10px; }
             h1 { border-bottom: 2px solid #2563eb; padding-bottom: 5px; }
@@ -65,26 +55,66 @@ const ResumePreview = ({ isOpen, onClose, resume }: ResumePreviewProps) => {
             li { margin-bottom: 5px; }
             .contact-info { margin-bottom: 20px; }
             .section { margin-bottom: 25px; }
+            .print-button {
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: #2563eb;
+              color: white;
+              padding: 12px 24px;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 14px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+              z-index: 1000;
+            }
+            .print-button:hover {
+              background: #1d4ed8;
+            }
           </style>
         </head>
         <body>
+          <button class="print-button no-print" onclick="window.print()">
+            📄 Download as PDF
+          </button>
           ${resume.optimized_content}
-          <div class="no-print" style="margin-top: 30px; text-align: center;">
-            <button onclick="window.print()" style="background: #2563eb; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
-              Download as PDF
-            </button>
-          </div>
+          <script>
+            // Auto-focus for better UX
+            window.focus();
+          </script>
         </body>
         </html>
-      `);
-      
-      printWindow.document.close();
-      printWindow.focus();
+      `;
 
-      toast({
-        title: "Resume ready for download",
-        description: "Click 'Download as PDF' in the new window to save your resume.",
-      });
+      // Try to open new window first
+      const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+      
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        toast({
+          title: "Resume ready for download",
+          description: "Click 'Download as PDF' in the new window to save your resume.",
+        });
+      } else {
+        // Fallback: create downloadable HTML file
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resume-${resume.job_title || 'optimized'}-${new Date().toISOString().split('T')[0]}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Resume downloaded",
+          description: "HTML file downloaded. Open it in a browser and print to PDF.",
+        });
+      }
 
     } catch (error) {
       console.error('Error preparing resume for download:', error);
@@ -125,8 +155,8 @@ const ResumePreview = ({ isOpen, onClose, resume }: ResumePreviewProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[95vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center">
             <FileText className="w-5 h-5 mr-2" />
             Resume Preview - {resume.job_title || 'Optimized Resume'}
@@ -136,16 +166,18 @@ const ResumePreview = ({ isOpen, onClose, resume }: ResumePreviewProps) => {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col">
-          <ScrollArea className="flex-1 h-[500px] border rounded-md p-4">
-            <div 
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: resume.optimized_content }}
-            />
-          </ScrollArea>
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 overflow-auto border rounded-md bg-white">
+            <div className="p-6">
+              <div 
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: resume.optimized_content }}
+              />
+            </div>
+          </div>
 
-          <div className="flex justify-between items-center pt-4 border-t">
-            <div className="text-sm text-gray-500">
+          <div className="flex-shrink-0 flex justify-between items-center pt-4 border-t bg-background">
+            <div className="text-sm text-muted-foreground">
               Theme: {resume.theme?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} • 
               Generated: {new Date(resume.created_at).toLocaleDateString()}
             </div>
