@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -143,13 +142,8 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
       const userSkills = resumeData?.extracted_skills || {};
       
-      const response = await fetch(`https://mtwkqxnsabqadrrxpdwl.functions.supabase.co/generate-interview-question`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('generate-interview-question', {
+        body: {
           interviewId: interview.id,
           jobTitle: interview.job_title,
           interviewType: interview.interview_type,
@@ -160,13 +154,11 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
           userAnswer: previousQuestions.length > 0 ? previousQuestions[previousQuestions.length - 1]?.user_answer_text : '',
           questionNumber,
           userSkills
-        })
+        }
       });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate question');
+      if (error) {
+        throw error;
       }
 
       setCurrentQuestion({
@@ -176,11 +168,11 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
       });
 
       resetQuestionTimer();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating question:', error);
       toast({
         title: "Error",
-        description: "Failed to generate next question.",
+        description: error.message || "Failed to generate next question.",
         variant: "destructive",
       });
     }
