@@ -77,7 +77,8 @@ Generate just the question text, nothing else:`;
       throw new Error('Server configuration error: Missing API key.');
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+    // Updated to use the correct Gemini model name
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
