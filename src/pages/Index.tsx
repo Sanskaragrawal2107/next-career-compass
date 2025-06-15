@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -330,7 +329,197 @@ const Index = () => {
     {
       question: 'What kind of support can I expect after subscribing?',
       answer: 'Subscribed members get priority support from our career experts. You can reach out to us via email for any queries regarding the platform, your reports, or general career advice. Our support email is spprtcareersarthi@gmail.com and we typically respond within 24 hours.'
-    }
+    },
+    // --- 2025 FAQs ---
+    // The Future of Work & AI
+    {
+      question: 'How will AI change job searching in 2025?',
+      answer: 'In 2025, AI will be a co-pilot, not just a tool. Expect hyper-personalized job matching, AI-driven career path suggestions, automated application tailoring, and AI coaches for interview prep. AI will analyze your skills against real-time market data to suggest upskilling paths for maximum employability.',
+    },
+    {
+      question: 'Will AI replace my job by 2025?',
+      answer: 'AI is more likely to augment jobs than replace them entirely. It will automate repetitive tasks, allowing humans to focus on strategic, creative, and interpersonal aspects. The key is to develop skills that complement AI, such as critical thinking, emotional intelligence, and AI management.',
+    },
+    {
+      question: 'What is a "hybrid skill set" and why is it crucial for 2025?',
+      answer: 'A hybrid skill set combines technical proficiency (like data analysis or coding) with strong soft skills (like communication or leadership). In 2025, employers will seek professionals who can not only work with technology but also lead teams, manage projects, and communicate complex ideas effectively.',
+    },
+    {
+      question: 'How will the 4-day work week trend evolve by 2025?',
+      answer: 'By 2025, we\'ll see more companies adopting results-oriented work environments (ROWE) rather than just a 4-day week. The focus will shift from hours worked to output and impact. Flexible schedules, asynchronous work, and project-based sprints will become more common.',
+    },
+    {
+      question: 'What role will "green skills" play in the 2025 job market?',
+      answer: '"Green skills" related to sustainability and environmental responsibility will be in high demand across all industries, not just energy. Roles will require knowledge of sustainable practices, carbon footprint reduction, and circular economy principles, from supply chain management to marketing.',
+    },
+    // Advanced Job Search Strategies for 2025
+    {
+      question: 'Is "cold applying" on job boards dead in 2025?',
+      answer: 'While not completely dead, its effectiveness has plummeted. In 2025, a successful strategy involves a "warm" approach: building a personal brand, networking within target companies, seeking referrals, and using AI tools to tailor applications meticulously. Quality over quantity is the mantra.',
+    },
+    {
+      question: 'How can I use personal branding to find a job in 2025?',
+      answer: 'In 2025, your personal brand is your career\'s storefront. Consistently share your expertise on platforms like LinkedIn, contribute to industry discussions, publish articles or create videos, and build a portfolio of your work. Recruiters are increasingly "headhunting" based on strong online presence.',
+    },
+    {
+      question: 'What are "stealth jobs" and how do I find them?',
+      answer: '"Stealth jobs" are roles that are filled internally or through networks before ever being advertised. To find them, you need to be an insider. Network proactively, conduct informational interviews, and make your career goals known to your connections. They are the key to the hidden job market.',
+    },
+    {
+      question: 'How should I tailor my resume for an AI-first world in 2025?',
+      answer: 'Your 2025 resume should be a "master document" that AI tools can adapt for each application. It needs to be rich with keywords, focused on quantifiable achievements, and include sections on new-age skills like AI literacy. Think of it as creating a data profile for yourself.',
+    },
+    {
+      question: 'What is the role of video in the 2025 application process?',
+      answer: 'Video will be integral. Expect to submit video introductions (instead of cover letters), complete one-way video interviews, and even showcase project walkthroughs via video. Proficiency in creating concise, professional video content will be a distinct advantage.',
+    },
+    // Emerging In-Demand Skills for 2025
+    {
+      question: 'Beyond coding, what are the top tech skills for 2025?',
+      answer: 'Top skills include AI/ML engineering, prompt engineering, cybersecurity, data ethics, cloud architecture, and quantum computing fundamentals. The ability to integrate and manage different AI tools (AI orchestration) will also be highly valued.',
+    },
+    {
+      question: 'What are the most critical "soft skills" for the 2025 workplace?',
+      answer: 'The most critical soft skills are adaptability, cognitive flexibility (the ability to unlearn and relearn), emotional intelligence, creativity, and digital collaboration. With AI handling routine tasks, human-centric skills become premium.',
+    },
+    {
+      question: 'What is "prompt engineering" and is it a viable career path?',
+      answer: 'Prompt engineering is the art and science of crafting effective inputs (prompts) to get desired outputs from AI models like GPT-4. It\'s a rapidly growing and highly valuable skill, becoming essential for marketers, content creators, developers, and researchers.',
+    },
+    {
+      question: 'Why is "data storytelling" a more valuable skill than just data analysis?',
+      answer: 'Data analysis is about finding insights; data storytelling is about communicating those insights effectively to drive action. In a data-flooded world, the ability to create compelling narratives and visualizations from data is a skill that influences decisions and makes you invaluable.',
+    },
+    {
+      question: 'Should I learn about Web3, blockchain, and the metaverse for my career?',
+      answer: 'Yes, having a foundational understanding is becoming crucial. Even if you\'re not a developer, knowing how these technologies could impact your industry (e.g., decentralized finance, NFTs in marketing, virtual collaboration) will make you more forward-thinking and adaptable.',
+    },
+    // Career Longevity & Adaptability
+    {
+      question: 'What is a "portfolio career" and is it the future?',
+      answer: 'A portfolio career involves juggling multiple income streams from different jobs, projects, or businesses, rather than relying on a single employer. It offers flexibility and security through diversification and is a growing trend for professionals at all levels.',
+    },
+    {
+      question: 'How often should I be upskilling in 2025 to stay relevant?',
+      answer: 'The concept of "lifelong learning" is now "continuous learning." Aim to dedicate 5-10 hours per week to learning. This could be through micro-learning, online courses, or project-based learning. The shelf-life of skills is shortening, so constant refresh is necessary.',
+    },
+    {
+      question: 'How can I future-proof my career against automation?',
+      answer: 'Focus on developing skills AI cannot easily replicate: complex problem-solving, creativity, critical thinking, leadership, and empathy. Embrace AI as a partner to enhance your productivity. Build a strong professional network and a personal brand.',
+    },
+    {
+      question: 'Is it still important to specialize, or should I be a generalist?',
+      answer: 'The ideal is the "T-shaped professional." You need deep expertise in one core area (the vertical bar of the T) combined with a broad knowledge base across multiple domains and strong collaboration skills (the horizontal bar). This combination drives innovation.',
+    },
+    {
+      question: 'How can older workers stay competitive in the 2025 job market?',
+      answer: 'Experienced workers should emphasize their strategic thinking, mentorship abilities, and deep industry knowledge. They must also demonstrate a commitment to continuous learning, embrace new technologies, and be open to reverse mentoring from younger colleagues.',
+    },
+    // Navigating Modern Workplace Dynamics
+    {
+      question: 'How do I negotiate for remote or hybrid work in 2025?',
+      answer: 'Frame your request around productivity and results, not just preference. Present a clear plan for communication and collaboration. Highlight your ability to work autonomously and reference successful remote projects. Research company policy beforehand.',
+    },
+    {
+      question: 'What are the new rules of workplace etiquette in a hybrid world?',
+      answer: 'Key rules include being mindful of time zones, having clear agendas for virtual meetings, using status indicators effectively, over-communicating to avoid misunderstandings, and creating intentional in-person time for team bonding and complex collaboration.',
+    },
+    {
+      question: 'How to combat "proximity bias" if I work remotely?',
+      answer: 'Proximity bias is the unconscious tendency to favor employees who are physically present. Combat it by being proactive in your communication, providing regular updates on your progress, volunteering for high-visibility projects, and making your achievements known to management.',
+    },
+    {
+      question: 'What role does mental health and well-being play in job selection in 2025?',
+      answer: 'It\'s a top priority. Candidates are actively evaluating companies based on their mental health benefits, flexible work policies, and culture of psychological safety. Companies that invest in employee well-being are seen as top employers.',
+    },
+    {
+      question: 'How is Diversity, Equity, and Inclusion (DEI) evolving in 2025?',
+      answer: 'DEI is moving beyond representation to focus on belonging and equity. Companies are using data to identify and address pay gaps, biases in promotion, and are implementing more inclusive leadership training. Candidates should look for tangible evidence of DEI commitment.',
+    },
+    // The Gig Economy & Entrepreneurship
+    {
+      question: 'Is freelancing a more secure career path than a full-time job in 2025?',
+      answer: 'It can be. While it lacks the perceived stability of a single paycheck, a successful freelancer has a diversified client base, making them resilient to a single company\'s downturn. Security in 2025 comes from in-demand skills and adaptability, not a job title.',
+    },
+    {
+      question: 'What skills do I need to succeed in the gig economy?',
+      answer: 'Beyond your core expertise, you need business management skills: marketing, sales, negotiation, project management, and financial planning. Strong self-discipline and communication are non-negotiable.',
+    },
+    {
+      question: 'How can I transition from a full-time role to a "solopreneur"?',
+      answer: 'Start by freelancing on the side to build a client base and validate your business idea. Create a financial runway (6-12 months of expenses). Build your personal brand and network intensely. Start small and scale gradually.',
+    },
+    {
+      question: 'What legal and financial aspects should I consider before going freelance in India?',
+      answer: 'You\'ll need to register for a GSTIN if your turnover exceeds the threshold, manage professional taxes, file income tax returns (ITR-3 or ITR-4), and consider professional indemnity insurance. It\'s wise to consult a Chartered Accountant (CA).',
+    },
+    {
+      question: 'How will AI impact freelancers and gig workers?',
+      answer: 'AI will be a massive productivity booster for freelancers. It can help with lead generation, content creation, administrative tasks, and even coding. Freelancers who master AI tools will be able to take on more work and deliver higher value.',
+    },
+    // Interviewing & Assessment in 2025
+    {
+      question: 'What are asynchronous video interviews (AVIs) and how do I ace them?',
+      answer: 'AVIs are one-way interviews where you record answers to pre-set questions. To ace them: prepare answers beforehand, create a professional background with good lighting, look directly at the camera, speak clearly, and show enthusiasm, even without a live interviewer.',
+    },
+    {
+      question: 'What kind of project-based assessments can I expect in 2025?',
+      answer: 'Expect practical, real-world tasks. For example, a marketer might be asked to create a mini-campaign strategy, a developer to debug a piece of code, or a data analyst to interpret a dataset and present findings. These "take-home" assignments are becoming standard.',
+    },
+    {
+      question: 'Will I be interviewed by an AI? How do I prepare?',
+      answer: 'Yes, initial screening interviews by AI avatars are becoming common. Prepare by focusing on clear, concise language. Use keywords from the job description. Maintain a professional demeanor and practice answering common questions clearly into a camera.',
+    },
+    {
+      question: 'How can I demonstrate "culture fit" in a remote interview process?',
+      answer: 'Research the company\'s values deeply. Ask insightful questions about their remote work culture, communication styles, and team dynamics. Share examples of how you have successfully collaborated in remote or hybrid teams in the past.',
+    },
+    {
+      question: 'What are the most impressive questions to ask an interviewer in 2025?',
+      answer: 'Ask forward-looking questions. Examples: "How is the team leveraging AI to improve its processes?", "What is the company\'s strategy for continuous learning and upskilling?", "How do you measure success for this role beyond the initial job description?".',
+    },
+    // Global Career Trends
+    {
+      question: 'What is a "digital nomad visa" and how can I get one?',
+      answer: 'It\'s a visa that allows you to live in a country while working remotely for an employer outside that country. Many countries now offer them. Requirements typically include proof of remote work, a minimum income level, and health insurance.',
+    },
+    {
+      question: 'What are the fastest-growing job markets globally for Indian professionals?',
+      answer: 'Key markets include Canada, Germany, Australia, and the UAE, which actively seek skilled professionals in tech, healthcare, and engineering. The remote job market in the US and UK also offers significant opportunities without relocation.',
+    },
+    {
+      question: 'How can I build a global network from India?',
+      answer: 'Actively participate in international online communities related to your field. Contribute to global open-source projects. Attend virtual international conferences. Use LinkedIn to connect with professionals in your target countries and engage with their content.',
+    },
+    {
+      question: 'What is "geo-arbitrage" and how can it benefit my career?',
+      answer: 'Geo-arbitrage is earning an income based on a high-cost economy (like the US) while living in a lower-cost location (like parts of India). Remote work makes this possible, allowing you to increase your savings and purchasing power significantly.',
+    },
+    {
+      question: 'How do I handle cross-cultural communication in a global team?',
+      answer: 'Be mindful of different communication styles (direct vs. indirect), attitudes towards hierarchy, and time zones. Be explicit and clear in written communication. Practice active listening and assume good intent.',
+    },
+    // Platform & Future Outlook
+    {
+      question: 'How will CareerBoost AI evolve to meet the challenges of 2025?',
+      answer: 'CareerBoost AI is committed to staying ahead of the curve. We are integrating more advanced predictive analytics for career pathing, developing AI negotiation simulators, and expanding our skill-gap analysis to include emerging "green" and "AI-centric" skills to ensure our users are always future-ready.',
+    },
+    {
+      question: 'Can AI truly understand the nuances of my career goals?',
+      answer: 'While AI is powerful, it works best as a co-pilot. Our platform combines AI\'s data-processing power with your input and our career experts\' insights. You set the destination; our AI helps you map the most efficient and effective route to get there.',
+    },
+    {
+      question: 'Will there be a "free" version of CareerBoost AI in 2025?',
+      answer: 'We will always offer valuable free tools, like our initial resume analysis, to help professionals get started. Our subscription model allows us to invest in the cutting-edge AI and expert support needed to provide the deep, personalized guidance that delivers life-changing career results.',
+    },
+    {
+      question: 'How does CareerBoost AI help with personal branding?',
+      answer: 'Our platform analyzes your skills and achievements to help you craft a compelling professional narrative. We provide keyword optimization for your LinkedIn profile, suggest content ideas to establish your expertise, and help you track the growth of your professional brand\'s impact.',
+    },
+    {
+      question: 'What is the single most important piece of career advice for 2025?',
+      answer: 'Be relentlessly curious and adaptable. The world of work is changing faster than ever. The most successful professionals will not be those with a fixed set of skills, but those who are masters of learning, unlearning, and relearning to meet new challenges and seize new opportunities.',
+    },
   ];
 
   if (loading) {
