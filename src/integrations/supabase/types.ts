@@ -14,24 +14,33 @@ export type Database = {
           created_at: string
           file_url: string | null
           id: string
+          job_description: string | null
           job_match_id: string
+          job_title: string | null
           optimized_content: string
+          theme: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           file_url?: string | null
           id?: string
+          job_description?: string | null
           job_match_id: string
+          job_title?: string | null
           optimized_content: string
+          theme?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           file_url?: string | null
           id?: string
+          job_description?: string | null
           job_match_id?: string
+          job_title?: string | null
           optimized_content?: string
+          theme?: string | null
           user_id?: string
         }
         Relationships: [

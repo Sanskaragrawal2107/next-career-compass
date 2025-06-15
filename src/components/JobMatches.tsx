@@ -6,6 +6,8 @@ import { ExternalLink, MapPin, DollarSign, Building, Star, Download } from 'luci
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import ResumeThemeSelector from '@/components/ResumeThemeSelector';
+import ResumePreview from '@/components/ResumePreview';
 
 interface JobRequirements {
   required_skills: string[];
@@ -29,6 +31,11 @@ const JobMatches = () => {
   const { user } = useAuth();
   const [jobMatches, setJobMatches] = useState<JobMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showResumePreview, setShowResumePreview] = useState(false);
+  const [selectedJobMatch, setSelectedJobMatch] = useState<JobMatch | null>(null);
+  const [generatedResume, setGeneratedResume] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     fetchJobMatches();
@@ -101,6 +108,53 @@ const JobMatches = () => {
     if (percentage >= 80) return 'text-blue-600 bg-blue-50 border-blue-200';
     if (percentage >= 70) return 'text-orange-600 bg-orange-50 border-orange-200';
     return 'text-red-600 bg-red-50 border-red-200';
+  };
+
+  const handleGenerateResume = (jobMatch: JobMatch) => {
+    setSelectedJobMatch(jobMatch);
+    setShowThemeSelector(true);
+  };
+
+  const handleThemeSelection = async (themeId: string) => {
+    if (!selectedJobMatch || !user) return;
+
+    setIsGenerating(true);
+    try {
+      console.log('Generating resume for job:', selectedJobMatch.job_title);
+      
+      const { data, error } = await supabase.functions.invoke('generate-optimized-resume', {
+        body: {
+          jobMatchId: selectedJobMatch.id,
+          theme: themeId,
+          userId: user.id
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setGeneratedResume(data.resume);
+        setShowThemeSelector(false);
+        setShowResumePreview(true);
+        
+        toast({
+          title: "Resume generated successfully!",
+          description: "Your ATS-optimized resume is ready for download.",
+        });
+      } else {
+        throw new Error(data.error || 'Failed to generate resume');
+      }
+
+    } catch (error: any) {
+      console.error('Error generating resume:', error);
+      toast({
+        title: "Resume generation failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (loading) {
@@ -209,9 +263,13 @@ const JobMatches = () => {
               )}
 
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1">
+                <Button 
+                  className="flex-1"
+                  onClick={() => handleGenerateResume(job)}
+                  disabled={isGenerating}
+                >
                   <Download className="w-4 h-4 mr-2" />
-                  Generate Optimized Resume
+                  {isGenerating ? 'Generating...' : 'Generate Optimized Resume'}
                 </Button>
                 <Button variant="outline" asChild>
                   <a href={job.job_url || '#'} target="_blank" rel="noopener noreferrer">
@@ -224,6 +282,19 @@ const JobMatches = () => {
           </Card>
         ))}
       </div>
+
+      <ResumeThemeSelector
+        isOpen={showThemeSelector}
+        onClose={() => setShowThemeSelector(false)}
+        onSelectTheme={handleThemeSelection}
+        isGenerating={isGenerating}
+      />
+
+      <ResumePreview
+        isOpen={showResumePreview}
+        onClose={() => setShowResumePreview(false)}
+        resume={generatedResume}
+      />
     </div>
   );
 };

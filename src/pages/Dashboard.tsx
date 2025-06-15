@@ -11,6 +11,7 @@ import ResumeAnalysis from '@/components/ResumeAnalysis';
 import JobMatches from '@/components/JobMatches';
 import SkillGapRoadmap from '@/components/SkillGapRoadmap';
 import MockInterview from '@/components/MockInterview';
+import GeneratedResumes from '@/components/GeneratedResumes';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -307,7 +308,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="upload" className="flex items-center">
               <Upload className="w-4 h-4 mr-2" />
               Upload Resume
@@ -323,6 +324,10 @@ const Dashboard = () => {
             <TabsTrigger value="roadmap" disabled={!uploadedResume}>
               <Target className="w-4 h-4 mr-2" />
               Skill Roadmap
+            </TabsTrigger>
+            <TabsTrigger value="resumes">
+              <FileText className="w-4 h-4 mr-2" />
+              My Resumes
             </TabsTrigger>
             <TabsTrigger value="interview">
               <Target className="w-4 h-4 mr-2" />
@@ -393,6 +398,10 @@ const Dashboard = () => {
               selectedJobTitles={selectedJobTitles}
               userSkills={roadmapSkills}
             />
+          </TabsContent>
+
+          <TabsContent value="resumes" className="space-y-6">
+            <GeneratedResumes />
           </TabsContent>
 
           <TabsContent value="interview" className="space-y-6">
