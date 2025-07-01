@@ -21,15 +21,19 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const shouldBeListeningRef = useRef(false);
 
   const isSupported = typeof navigator !== 'undefined' && 
                      'mediaDevices' in navigator && 
                      'getUserMedia' in navigator.mediaDevices;
 
+  const API_KEY = '1ae99acbc8b44b569c3ff8ce381dab51';
+
   const cleanupResources = useCallback(() => {
     console.log('Cleaning up speech recognition resources');
+    
+    shouldBeListeningRef.current = false;
     
     // Stop media recorder
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -43,7 +47,9 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
     // Close WebSocket connection
     if (websocketRef.current) {
       try {
-        websocketRef.current.close();
+        if (websocketRef.current.readyState === WebSocket.OPEN) {
+          websocketRef.current.close(1000, 'Manual close');
+        }
       } catch (err) {
         console.error('Error closing websocket:', err);
       }
@@ -62,10 +68,14 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       streamRef.current = null;
     }
 
-    // Clear reconnect timeout
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    // Close audio context
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch (err) {
+        console.error('Error closing audio context:', err);
+      }
+      audioContextRef.current = null;
     }
   }, []);
 
@@ -76,12 +86,12 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
     }
 
     try {
-      console.log('Starting AssemblyAI speech recognition...');
+      console.log('Starting AssemblyAI streaming transcription...');
       setError(null);
       setIsLoading(true);
       shouldBeListeningRef.current = true;
 
-      // Get microphone access with specific constraints
+      // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
@@ -95,15 +105,18 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       console.log('Microphone access granted');
       streamRef.current = stream;
 
-      // Create WebSocket connection to AssemblyAI
-      const websocketUrl = 'wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=1ae99acbc8b44b569c3ff8ce381dab51';
-      console.log('Connecting to AssemblyAI WebSocket...');
+      // Create audio context for processing
+      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+      
+      // Create WebSocket connection to AssemblyAI streaming API
+      const websocketUrl = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=${API_KEY}`;
+      console.log('Connecting to AssemblyAI streaming API...');
       
       const websocket = new WebSocket(websocketUrl);
       websocketRef.current = websocket;
 
       websocket.onopen = () => {
-        console.log('✅ Connected to AssemblyAI real-time transcription');
+        console.log('✅ Connected to AssemblyAI streaming transcription');
         setIsLoading(false);
         setIsListening(true);
         setError(null);
@@ -112,18 +125,25 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       websocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('AssemblyAI message:', data);
+          console.log('AssemblyAI streaming message:', data);
           
           if (data.message_type === 'FinalTranscript') {
             if (data.text && data.text.trim()) {
               console.log('Final transcript:', data.text);
-              setTranscript(prev => prev + ' ' + data.text.trim());
+              setTranscript(prev => {
+                const newTranscript = prev + ' ' + data.text.trim();
+                return newTranscript.trim();
+              });
             }
           } else if (data.message_type === 'PartialTranscript') {
             if (data.text && data.text.trim()) {
               console.log('Partial transcript:', data.text);
-              // You can optionally show partial transcripts in real-time
+              // Optionally handle partial transcripts for real-time feedback
             }
+          } else if (data.message_type === 'SessionBegins') {
+            console.log('AssemblyAI session began:', data.session_id);
+          } else if (data.message_type === 'SessionTerminated') {
+            console.log('AssemblyAI session terminated');
           }
         } catch (err) {
           console.error('Error parsing WebSocket message:', err);
@@ -135,40 +155,39 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
         setError('Connection to AssemblyAI failed. Please check your internet connection.');
         setIsLoading(false);
         setIsListening(false);
+        shouldBeListeningRef.current = false;
       };
 
       websocket.onclose = (event) => {
         console.log('WebSocket connection closed:', event.code, event.reason);
         setIsListening(false);
         
-        // Only attempt reconnection if we should still be listening and it wasn't a manual close
+        // Only show error if we weren't expecting to close
         if (shouldBeListeningRef.current && event.code !== 1000) {
-          console.log('Attempting to reconnect...');
-          setError('Connection lost. Attempting to reconnect...');
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (shouldBeListeningRef.current) {
-              console.log('Reconnecting to AssemblyAI...');
-              startListening();
-            }
-          }, 2000);
+          setError('Connection to AssemblyAI was lost unexpectedly.');
         }
       };
 
-      // Set up MediaRecorder to capture audio
+      // Set up MediaRecorder for streaming audio
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 16000
       });
 
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && websocketRef.current?.readyState === WebSocket.OPEN) {
-          // Convert blob to base64 and send to AssemblyAI
+        if (event.data.size > 0 && 
+            websocketRef.current?.readyState === WebSocket.OPEN && 
+            shouldBeListeningRef.current) {
+          
+          // Convert audio blob to base64 and send to AssemblyAI
           const reader = new FileReader();
           reader.onload = () => {
             try {
-              const base64Audio = (reader.result as string).split(',')[1];
+              const audioData = reader.result as string;
+              const base64Audio = audioData.split(',')[1]; // Remove data:audio/webm;base64, prefix
+              
               if (websocketRef.current?.readyState === WebSocket.OPEN) {
                 websocketRef.current.send(JSON.stringify({
                   audio_data: base64Audio
@@ -188,14 +207,19 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       mediaRecorder.onerror = (event) => {
         console.error('MediaRecorder error:', event);
         setError('Microphone recording error occurred');
+        shouldBeListeningRef.current = false;
       };
 
-      // Start recording with small time slices for real-time processing
-      mediaRecorder.start(250); // Increased interval for better stability
-      console.log('MediaRecorder started');
+      mediaRecorder.onstop = () => {
+        console.log('MediaRecorder stopped');
+      };
+
+      // Start recording with frequent data chunks for streaming
+      mediaRecorder.start(100); // Send data every 100ms for better streaming
+      console.log('MediaRecorder started for streaming');
 
     } catch (err: any) {
-      console.error('❌ Error starting speech recognition:', err);
+      console.error('❌ Error starting streaming transcription:', err);
       setError(`Failed to start: ${err.message}`);
       setIsLoading(false);
       shouldBeListeningRef.current = false;
@@ -204,8 +228,18 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
   }, [isListening, isSupported, cleanupResources]);
 
   const stopListening = useCallback(() => {
-    console.log('Stopping speech recognition...');
+    console.log('Stopping streaming transcription...');
     shouldBeListeningRef.current = false;
+    
+    // Send terminate message to AssemblyAI
+    if (websocketRef.current?.readyState === WebSocket.OPEN) {
+      try {
+        websocketRef.current.send(JSON.stringify({ terminate_session: true }));
+      } catch (err) {
+        console.error('Error sending terminate message:', err);
+      }
+    }
+    
     setIsListening(false);
     cleanupResources();
   }, [cleanupResources]);
