@@ -358,7 +358,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
       return (
         <div className="flex items-center justify-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-          <span className="text-blue-700 text-sm">Connecting to AssemblyAI...</span>
+          
         </div>
       );
     }

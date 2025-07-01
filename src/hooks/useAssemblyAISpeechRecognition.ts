@@ -28,8 +28,6 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
                      'mediaDevices' in navigator && 
                      'getUserMedia' in navigator.mediaDevices;
 
-  const API_KEY = process.env.REACT_APP_ASSEMBLYAI_API_KEY;
-
   const cleanupResources = useCallback(() => {
     console.log('Cleaning up speech recognition resources');
     
@@ -108,14 +106,21 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       // Create audio context for processing
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
       
+      // Get temporary token from our server
+      const response = await fetch('/api/create-assemblyai-token', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AssemblyAI token');
+      }
+
+      const { token } = await response.json();
+
       // Create WebSocket connection to AssemblyAI streaming API
-      const websocketUrl = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=${API_KEY}`;
-      console.log('Connecting to AssemblyAI streaming API...');
+      const websocketUrl = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=${token}`;
       
       const websocket = new WebSocket(websocketUrl);
-      websocketRef.current = websocket;
-
-      """      """      const websocket = new WebSocket(websocketUrl);
       websocketRef.current = websocket;
 
       const connectionTimeout = setTimeout(() => {
@@ -140,7 +145,7 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
             clearInterval(keepAliveInterval);
           }
         }, 5000);
-      };"""""
+      };
 
       websocket.onmessage = (event) => {
         try {
@@ -170,13 +175,13 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
         }
       };
 
-      """      websocket.onerror = (error) => {
+      websocket.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
         setError('Connection to AssemblyAI failed. Please check your internet connection and API key.');
         setIsLoading(false);
         setIsListening(false);
         shouldBeListeningRef.current = false;
-      };"""
+      };
 
       websocket.onclose = (event) => {
         console.log('WebSocket connection closed:', event.code, event.reason);
