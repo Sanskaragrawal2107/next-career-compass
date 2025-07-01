@@ -28,7 +28,7 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
                      'mediaDevices' in navigator && 
                      'getUserMedia' in navigator.mediaDevices;
 
-  const API_KEY = '1ae99acbc8b44b569c3ff8ce381dab51';
+  const API_KEY = process.env.REACT_APP_ASSEMBLYAI_API_KEY;
 
   const cleanupResources = useCallback(() => {
     console.log('Cleaning up speech recognition resources');
@@ -115,12 +115,32 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       const websocket = new WebSocket(websocketUrl);
       websocketRef.current = websocket;
 
+      """      """      const websocket = new WebSocket(websocketUrl);
+      websocketRef.current = websocket;
+
+      const connectionTimeout = setTimeout(() => {
+        if (websocket.readyState !== WebSocket.OPEN) {
+          setError('Connection to AssemblyAI timed out.');
+          websocket.close();
+        }
+      }, 10000); // 10-second timeout
+
       websocket.onopen = () => {
+        clearTimeout(connectionTimeout);
         console.log('✅ Connected to AssemblyAI streaming transcription');
         setIsLoading(false);
         setIsListening(true);
         setError(null);
-      };
+
+        // Send a keep-alive message every 5 seconds
+        const keepAliveInterval = setInterval(() => {
+          if (websocket.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify({}));
+          } else {
+            clearInterval(keepAliveInterval);
+          }
+        }, 5000);
+      };"""""
 
       websocket.onmessage = (event) => {
         try {
@@ -150,13 +170,13 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
         }
       };
 
-      websocket.onerror = (error) => {
+      """      websocket.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
-        setError('Connection to AssemblyAI failed. Please check your internet connection.');
+        setError('Connection to AssemblyAI failed. Please check your internet connection and API key.');
         setIsLoading(false);
         setIsListening(false);
         shouldBeListeningRef.current = false;
-      };
+      };"""
 
       websocket.onclose = (event) => {
         console.log('WebSocket connection closed:', event.code, event.reason);
