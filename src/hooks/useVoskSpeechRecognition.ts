@@ -25,8 +25,8 @@ export const useVoskSpeechRecognition = (): VoskSpeechRecognitionHook => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
+  const modelRef = useRef<any>(null);
   const recognizerRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -41,14 +41,14 @@ export const useVoskSpeechRecognition = (): VoskSpeechRecognitionHook => {
       setError(null);
 
       // Dynamically import Vosk
-      const { createModel, createRecognizer } = await import('vosk-browser');
+      const { createModel, Model } = await import('vosk-browser');
       
       // Load the model (using a small English model)
       const modelUrl = 'https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip';
-      const model = await createModel(modelUrl);
+      modelRef.current = await createModel(modelUrl);
       
-      // Create recognizer
-      recognizerRef.current = new (await createRecognizer(model, 16000))();
+      // Create recognizer using the Model constructor
+      recognizerRef.current = new Model(modelRef.current, 16000);
       
       setIsLoading(false);
       return true;
@@ -109,9 +109,13 @@ export const useVoskSpeechRecognition = (): VoskSpeechRecognitionHook => {
         if (recognizerRef.current.acceptWaveform) {
           const result = recognizerRef.current.acceptWaveform(pcmData);
           if (result) {
-            const resultObj = JSON.parse(result);
-            if (resultObj.text) {
-              setTranscript(prev => prev + ' ' + resultObj.text);
+            try {
+              const resultObj = JSON.parse(result);
+              if (resultObj.text && resultObj.text.trim()) {
+                setTranscript(prev => prev + ' ' + resultObj.text.trim());
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse Vosk result:', parseError);
             }
           }
         }
@@ -133,9 +137,14 @@ export const useVoskSpeechRecognition = (): VoskSpeechRecognitionHook => {
     
     // Get final result
     if (recognizerRef.current && recognizerRef.current.finalResult) {
-      const finalResult = JSON.parse(recognizerRef.current.finalResult());
-      if (finalResult.text) {
-        setTranscript(prev => prev + ' ' + finalResult.text);
+      try {
+        const finalResult = recognizerRef.current.finalResult();
+        const finalResultObj = JSON.parse(finalResult);
+        if (finalResultObj.text && finalResultObj.text.trim()) {
+          setTranscript(prev => prev + ' ' + finalResultObj.text.trim());
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse final Vosk result:', parseError);
       }
     }
     
