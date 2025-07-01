@@ -13,10 +13,11 @@ import {
   RotateCcw,
   Play,
   Pause,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
-import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { useVoskSpeechRecognition } from '@/hooks/useVoskSpeechRecognition';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -34,7 +35,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 }) => {
   const { user } = useAuth();
   const camera = useCamera();
-  const speechRecognition = useSpeechRecognition();
+  const speechRecognition = useVoskSpeechRecognition();
   
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [questionLoading, setQuestionLoading] = useState(false);
@@ -52,7 +53,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
     if (!speechRecognition.isSupported) {
       toast({
         title: "Speech Recognition Not Supported",
-        description: "Your browser doesn't support speech recognition. Please use Chrome, Edge, or Safari.",
+        description: "Your browser doesn't support microphone access. Please use a modern browser and allow microphone permissions.",
         variant: "destructive",
       });
     }
@@ -273,11 +274,6 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
   const completeInterview = async () => {
     try {
-      // For demonstration, a mock score is generated.
-      // In a real application, a backend function would perform AI analysis
-      // of the answers to generate a score and detailed feedback.
-      const mockScore = Math.random() * 2 + 2.5; // Score between 2.5 and 4.5 for variability
-
       const { data: updatedInterview, error } = await supabase
         .from('mock_interviews')
         .update({
@@ -291,14 +287,12 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
       if (error) throw error;
 
-      // Kick off the analysis in the background. No need to await.
+      // Kick off the analysis in the background
       supabase.functions.invoke('analyze-interview-performance', {
         body: { interviewId: interview.id }
       }).then(({ error: functionError }) => {
         if (functionError) {
           console.error("Error analyzing interview:", functionError);
-          // Optionally, you could update the interview status to 'analysis_failed'
-          // and show a message to the user.
         }
       });
 
@@ -361,6 +355,15 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
   const progress = (currentQuestionNumber / interview.total_questions) * 100;
 
   const renderSpeechRecognitionStatus = () => {
+    if (speechRecognition.isLoading) {
+      return (
+        <div className="flex items-center justify-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <Download className="w-4 h-4 text-blue-500 mr-2 animate-pulse" />
+          <span className="text-blue-700 text-sm">Loading speech recognition model...</span>
+        </div>
+      );
+    }
+
     if (speechRecognition.error) {
       return (
         <div className="flex items-center justify-center p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -373,7 +376,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
     if (speechRecognition.isListening) {
       return (
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Listening... Click stop when finished</p>
+          <p className="text-sm text-muted-foreground">Listening with Vosk... Click stop when finished</p>
           <div className="mt-2 flex justify-center">
             <div className="bg-red-500 rounded-full w-3 h-3 animate-pulse"></div>
           </div>
@@ -390,12 +393,16 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
     if (!speechRecognition.isSupported) {
       return (
         <div className="text-center text-orange-500 text-sm">
-          Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.
+          Microphone access not supported in this browser. Please use a modern browser and allow microphone permissions.
         </div>
       );
     }
 
-    return null;
+    return (
+      <div className="text-center text-green-600 text-sm">
+        Ready to use Vosk speech recognition
+      </div>
+    );
   };
 
   return (
@@ -493,7 +500,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
                   <div className="flex justify-center">
                     <Button
                       onClick={handleAnswer}
-                      disabled={savingAnswer || isPaused || !speechRecognition.isSupported}
+                      disabled={savingAnswer || isPaused || !speechRecognition.isSupported || speechRecognition.isLoading}
                       size="lg"
                       className={`${speechRecognition.isListening ? 'bg-red-500 hover:bg-red-600' : ''} transition-colors`}
                     >
