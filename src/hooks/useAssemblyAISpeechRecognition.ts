@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 export interface AssemblyAISpeechRecognitionHook {
@@ -107,7 +106,12 @@ export const useAssemblyAISpeechRecognition = (): AssemblyAISpeechRecognitionHoo
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
       
       // Get temporary token from our server
-      const response = await fetch('/api/create-assemblyai-token', {
+      // Use local Supabase Edge Function for dev, production URL for deployed
+      const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+      const supabaseEdgeUrl = isLocal
+        ? 'http://localhost:54321/functions/v1/create-assemblyai-token'
+        : 'https://mtwkqxnsabqadrrxpdwl.functions.supabase.co/create-assemblyai-token';
+      const response = await fetch(supabaseEdgeUrl, {
         method: 'POST',
       });
 
