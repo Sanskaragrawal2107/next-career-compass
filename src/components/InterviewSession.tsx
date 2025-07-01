@@ -13,11 +13,10 @@ import {
   RotateCcw,
   Play,
   Pause,
-  AlertCircle,
-  Download
+  AlertCircle
 } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
-import { useVoskSpeechRecognition } from '@/hooks/useVoskSpeechRecognition';
+import { useAssemblyAISpeechRecognition } from '@/hooks/useAssemblyAISpeechRecognition';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -35,7 +34,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 }) => {
   const { user } = useAuth();
   const camera = useCamera();
-  const speechRecognition = useVoskSpeechRecognition();
+  const speechRecognition = useAssemblyAISpeechRecognition();
   
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [questionLoading, setQuestionLoading] = useState(false);
@@ -358,8 +357,8 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
     if (speechRecognition.isLoading) {
       return (
         <div className="flex items-center justify-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <Download className="w-4 h-4 text-blue-500 mr-2 animate-pulse" />
-          <span className="text-blue-700 text-sm">Loading speech recognition model...</span>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+          <span className="text-blue-700 text-sm">Connecting to AssemblyAI...</span>
         </div>
       );
     }
@@ -376,7 +375,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
     if (speechRecognition.isListening) {
       return (
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Listening with Vosk... Click stop when finished</p>
+          <p className="text-sm text-muted-foreground">Listening with AssemblyAI... Click stop when finished</p>
           <div className="mt-2 flex justify-center">
             <div className="bg-red-500 rounded-full w-3 h-3 animate-pulse"></div>
           </div>
@@ -400,7 +399,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
     return (
       <div className="text-center text-green-600 text-sm">
-        Ready to use Vosk speech recognition
+        Ready to use AssemblyAI speech recognition
       </div>
     );
   };
@@ -500,7 +499,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
                   <div className="flex justify-center">
                     <Button
                       onClick={handleAnswer}
-                      disabled={savingAnswer || isPaused || !speechRecognition.isSupported || speechRecognition.isLoading}
+                      disabled={savingAnswer || isPaused || !speechRecognition.isSupported}
                       size="lg"
                       className={`${speechRecognition.isListening ? 'bg-red-500 hover:bg-red-600' : ''} transition-colors`}
                     >
