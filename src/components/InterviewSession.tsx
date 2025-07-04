@@ -16,7 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
-import { useAssemblyAISpeechRecognition } from '@/hooks/useAssemblyAISpeechRecognition';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -34,7 +34,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 }) => {
   const { user } = useAuth();
   const camera = useCamera();
-  const speechRecognition = useAssemblyAISpeechRecognition();
+  const speechRecognition = useSpeechRecognition();
   
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [questionLoading, setQuestionLoading] = useState(false);
@@ -375,7 +375,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
     if (speechRecognition.isListening) {
       return (
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Listening with AssemblyAI... Click stop when finished</p>
+          <p className="text-sm text-muted-foreground">Listening... Click stop when finished</p>
           <div className="mt-2 flex justify-center">
             <div className="bg-red-500 rounded-full w-3 h-3 animate-pulse"></div>
           </div>
@@ -399,7 +399,7 @@ const InterviewSession: React.FC<InterviewSessionProps> = ({
 
     return (
       <div className="text-center text-green-600 text-sm">
-        Ready to use AssemblyAI speech recognition
+        Ready to use speech recognition
       </div>
     );
   };
