@@ -1,12 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
-
 export interface SpeechRecognitionHook {
   isListening: boolean;
   transcript: string;
@@ -24,12 +17,15 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  const recognitionRef = useRef<any>(null);
+  const voskRef = useRef<any>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const shouldBeListeningRef = useRef(false);
 
-  // Check if Web Speech API is supported
+  // Check if browser supports the required APIs
   const isSupported = typeof window !== 'undefined' && 
-                     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+                     'MediaRecorder' in window &&
+                     'AudioContext' in window &&
+                     'WebAssembly' in window;
 
   const startListening = useCallback(async () => {
     if (isListening || !isSupported) {
@@ -38,118 +34,114 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
     }
 
     try {
-      console.log('Starting Web Speech API transcription...');
+      console.log('Starting Vosk speech recognition...');
       setError(null);
       setIsLoading(true);
       shouldBeListeningRef.current = true;
 
-      // Create speech recognition instance
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      // Dynamic import of Vosk
+      const { createModel } = await import('vosk-browser');
+
+      // Load the English model (small size for faster loading)
+      const modelUrl = 'https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip';
+      console.log('Loading Vosk model...');
       
-      // Configure recognition
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-      recognition.maxAlternatives = 1;
+      const model = await createModel(modelUrl);
+      console.log('✅ Vosk model loaded');
+      
+      const recognizer = new model.KaldiRecognizer(16000);
+      voskRef.current = recognizer;
 
-      recognitionRef.current = recognition;
-
-      recognition.onstart = () => {
-        console.log('✅ Speech recognition started');
-        setIsLoading(false);
-        setIsListening(true);
-        setError(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript;
-          } else {
-            interimTranscript += result[0].transcript;
-          }
-        }
-
-        if (finalTranscript) {
-          console.log('Final transcript:', finalTranscript);
+      // Set up event listeners for recognition results
+      recognizer.on("result", (message: any) => {
+        if (message.result.text && message.result.text.trim()) {
+          console.log('Vosk result:', message.result.text);
           setTranscript(prev => {
-            const newTranscript = prev + ' ' + finalTranscript.trim();
+            const newTranscript = prev + ' ' + message.result.text.trim();
             return newTranscript.trim();
           });
         }
-      };
+      });
 
-      recognition.onerror = (event: any) => {
-        console.error('❌ Speech recognition error:', event.error);
-        setIsLoading(false);
-        
-        switch (event.error) {
-          case 'no-speech':
-            setError('No speech detected. Please speak into the microphone.');
-            break;
-          case 'audio-capture':
-            setError('No microphone found or permission denied.');
-            break;
-          case 'not-allowed':
-            setError('Microphone permission denied. Please allow microphone access.');
-            break;
-          case 'network':
-            setError('Network error. Please check your internet connection.');
-            break;
-          case 'service-not-allowed':
-            setError('Speech recognition service not allowed.');
-            break;
-          default:
-            setError(`Speech recognition error: ${event.error}`);
+      recognizer.on("partialresult", (message: any) => {
+        if (message.result.partial && message.result.partial.trim()) {
+          console.log('Vosk partial:', message.result.partial);
+          // Optionally handle partial results for real-time feedback
         }
-        
-        setIsListening(false);
-        shouldBeListeningRef.current = false;
-      };
+      });
 
-      recognition.onend = () => {
-        console.log('Speech recognition ended');
-        setIsListening(false);
-        
-        // Restart if we should still be listening
-        if (shouldBeListeningRef.current) {
-          console.log('Restarting speech recognition...');
-          setTimeout(() => {
-            if (shouldBeListeningRef.current) {
-              recognition.start();
-            }
-          }, 100);
+      // Get microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
+
+      mediaStreamRef.current = stream;
+      console.log('✅ Microphone access granted');
+
+      // Create audio context
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      processor.onaudioprocess = (event) => {
+        if (!shouldBeListeningRef.current || !voskRef.current) return;
+
+        try {
+          recognizer.acceptWaveform(event.inputBuffer);
+        } catch (error) {
+          console.error('acceptWaveform failed', error);
         }
       };
 
-      // Start recognition
-      recognition.start();
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      // Store cleanup references
+      voskRef.current._cleanup = () => {
+        processor.disconnect();
+        source.disconnect();
+        audioContext.close();
+      };
+
+      setIsLoading(false);
+      setIsListening(true);
+      console.log('✅ Vosk speech recognition started');
 
     } catch (err: any) {
-      console.error('❌ Error starting speech recognition:', err);
+      console.error('❌ Error starting Vosk speech recognition:', err);
       setError(`Failed to start: ${err.message}`);
       setIsLoading(false);
       shouldBeListeningRef.current = false;
+      
+      // Cleanup on error
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
     }
   }, [isListening, isSupported]);
 
   const stopListening = useCallback(() => {
-    console.log('Stopping speech recognition...');
+    console.log('Stopping Vosk speech recognition...');
     shouldBeListeningRef.current = false;
     
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (err) {
-        console.error('Error stopping speech recognition:', err);
-      }
-      recognitionRef.current = null;
+    // Stop media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
+    
+    // Cleanup Vosk recognizer
+    if (voskRef.current && voskRef.current._cleanup) {
+      voskRef.current._cleanup();
+    }
+    voskRef.current = null;
     
     setIsListening(false);
   }, []);
@@ -164,8 +156,11 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
   useEffect(() => {
     return () => {
       shouldBeListeningRef.current = false;
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (voskRef.current && voskRef.current._cleanup) {
+        voskRef.current._cleanup();
       }
     };
   }, []);
